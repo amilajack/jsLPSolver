@@ -827,12 +827,11 @@ var Tableau = require("./Tableau/Tableau.js");
         // If the user is giving us an array
         // or a string, convert it to a JSON Model
         // otherwise, spit it out as a string
-        if(model.length){
-            return to_JSON(model);
-        } else {
-            return from_JSON(model);
-        }
-    };
+        // if(model.length){
+        //     return to_JSON(model);
+        // } else {
+        //     return from_JSON(model);
+        // }
 
     var Solution = require("./Solution.js");
 
@@ -2916,7 +2915,8 @@ Tableau.prototype.checkForCycles = function (varIndexes) {
     };
 
 
-        Constraint: Constraint,
+     const foo = {
+       Constraint: Constraint,
         Variable: Variable,
         IntegerVariable: IntegerVariable,
         SlackVariable: SlackVariable,
@@ -3076,4 +3076,3 @@ Tableau.prototype.checkForCycles = function (varIndexes) {
         };
         
     };
-}
