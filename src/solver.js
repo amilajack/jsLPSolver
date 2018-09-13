@@ -1,15 +1,4 @@
-(function(){if (typeof exports === "object") {
-    export default require("./main");
-}})();
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw (f.code="MODULE_NOT_FOUND", f)}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-    /*global describe*/
-    /*global require*/
-    /*global module*/
-    /*global it*/
-    /*global console*/
-    /*global process*/
-
-    var Tableau = require("./Tableau/Tableau.js");
+var Tableau = require("./Tableau/Tableau.js");
     var branchAndCut = require("./Tableau/branchAndCut.js");
     var expressions = require("./expressions.js");
     var Constraint = expressions.Constraint;
@@ -48,7 +37,6 @@
 
         this.checkForCycles = false;
     }
-    export default Model;
 
     Model.prototype.minimize = function () {
         this.isMinimization = true;
@@ -379,13 +367,6 @@
     Model.prototype.log = function (message) {
         return this.tableau.log(message);
     };
-},{"./Tableau/Tableau.js":6,"./Tableau/branchAndCut.js":8,"./expressions.js":17}],2:[function(require,module,exports){
-    /*global describe*/
-    /*global require*/
-    /*global module*/
-    /*global it*/
-    /*global console*/
-    /*global process*/
 
     /***************************************************************
      * Method: polyopt
@@ -417,7 +398,7 @@
 
      **************************************************************/
 
-    export default function(solver, model){
+    function foo() {
 
         // I have no idea if this is actually works, or what,
         // but here is my algorithm to solve linear programs
@@ -577,14 +558,6 @@
         };    
 
     };
-},{}],3:[function(require,module,exports){
-    /*global describe*/
-    /*global require*/
-    /*global module*/
-    /*global it*/
-    /*global console*/
-    /*global process*/
-    /*jshint -W083 */
 
 
 
@@ -851,7 +824,6 @@
     }
 
 
-    export default function (model) {
         // If the user is giving us an array
         // or a string, convert it to a JSON Model
         // otherwise, spit it out as a string
@@ -861,19 +833,16 @@
             return from_JSON(model);
         }
     };
-},{}],4:[function(require,module,exports){
-    /*global module*/
-    /*global require*/
+
     var Solution = require("./Solution.js");
 
     function MilpSolution(tableau, evaluation, feasible, bounded, branchAndCutIterations) {
         Solution.call(this, tableau, evaluation, feasible, bounded);
         this.iter = branchAndCutIterations;
     }
-    export default MilpSolution;
     MilpSolution.prototype = Object.create(Solution.prototype);
     MilpSolution.constructor = MilpSolution;
-},{"./Solution.js":5}],5:[function(require,module,exports){
+
     /*global module*/
 
     function Solution(tableau, evaluation, feasible, bounded) {
@@ -882,7 +851,6 @@
         this.bounded = bounded;
         this._tableau = tableau;
     }
-    export default Solution;
 
     Solution.prototype.generateSolutionSet = function () {
         var solutionSet = {};
@@ -909,7 +877,6 @@
 
         return solutionSet;
     };
-},{}],6:[function(require,module,exports){
     /*global describe*/
     /*global require*/
     /*global module*/
@@ -971,7 +938,6 @@
 
         this.branchAndCutIterations = 0;
     }
-    export default Tableau;
 
     Tableau.prototype.solve = function () {
         if (this.model.getNumberOfIntegerVariables() > 0) {
@@ -1167,7 +1133,7 @@
             return new Solution(this, evaluation, this.feasible, this.bounded);
         }
     };
-},{"./MilpSolution.js":4,"./Solution.js":5}],7:[function(require,module,exports){
+
 /*global require*/
 var Tableau = require("./Tableau.js");
 
@@ -1285,7 +1251,7 @@ Tableau.prototype.restore = function () {
     }
 };
 
-},{"./Tableau.js":6}],8:[function(require,module,exports){
+
 /*global describe*/
 /*global require*/
 /*global module*/
@@ -1518,7 +1484,6 @@ Tableau.prototype.branchAndCut = function () {
     this.branchAndCutIterations = iterations;
 };
 
-},{"./Tableau.js":6}],9:[function(require,module,exports){
 /*global require*/
 var Tableau = require("./Tableau.js");
 
@@ -1589,7 +1554,6 @@ Tableau.prototype.getFractionalVarWithLowestCost = function () {
     return new VariableData(selectedVarIndex, selectedVarValue);
 };
 
-},{"./Tableau.js":6}],10:[function(require,module,exports){
 /*global require*/
 var Tableau = require("./Tableau.js");
 var SlackVariable = require("../expressions.js").SlackVariable;
@@ -1715,7 +1679,7 @@ Tableau.prototype.applyMIRCuts = function () {
     }
 };
 
-},{"../expressions.js":17,"./Tableau.js":6}],11:[function(require,module,exports){
+
 /*global require*/
 /*global console*/
 var Tableau = require("./Tableau.js");
@@ -2021,7 +1985,6 @@ Tableau.prototype.removeVariable = function (variable) {
     this.width -= 1;
 };
 
-},{"./Tableau.js":6}],12:[function(require,module,exports){
     /*global require*/
     /*global module*/
     require("./simplex.js");
@@ -2032,8 +1995,6 @@ Tableau.prototype.removeVariable = function (variable) {
     require("./branchingStrategies.js");
     require("./integerProperties.js");
 
-    export default require("./Tableau.js");
-},{"./Tableau.js":6,"./backup.js":7,"./branchingStrategies.js":9,"./cuttingStrategies.js":10,"./dynamicModification.js":11,"./integerProperties.js":13,"./log.js":14,"./simplex.js":15}],13:[function(require,module,exports){
 /*global require*/
 var Tableau = require("./Tableau.js");
 
@@ -2122,7 +2083,6 @@ Tableau.prototype.computeFractionalVolume = function(ignoreIntegerValues) {
     return volume;
 };
 
-},{"./Tableau.js":6}],14:[function(require,module,exports){
 /*global require*/
 /*global console*/
 var Tableau = require("./Tableau.js");
@@ -2294,7 +2254,6 @@ Tableau.prototype.log = function (message, force) {
     return this;
 };
 
-},{"./Tableau.js":6}],15:[function(require,module,exports){
 /*global describe*/
 /*global require*/
 /*global module*/
@@ -2689,7 +2648,6 @@ Tableau.prototype.checkForCycles = function (varIndexes) {
     return [];
 };
 
-},{"./Tableau.js":6}],16:[function(require,module,exports){
     /*global describe*/
     /*global require*/
     /*global module*/
@@ -2767,7 +2725,6 @@ Tableau.prototype.checkForCycles = function (varIndexes) {
             return model;
         }
     };
-},{}],17:[function(require,module,exports){
     /*global describe*/
     /*global require*/
     /*global module*/
@@ -2959,7 +2916,6 @@ Tableau.prototype.checkForCycles = function (varIndexes) {
     };
 
 
-    export default {
         Constraint: Constraint,
         Variable: Variable,
         IntegerVariable: IntegerVariable,
@@ -2967,14 +2923,6 @@ Tableau.prototype.checkForCycles = function (varIndexes) {
         Equality: Equality,
         Term: Term
     };
-},{}],18:[function(require,module,exports){
-    /*global describe*/
-    /*global require*/
-    /*global module*/
-    /*global it*/
-    /*global console*/
-    /*global process*/
-
 
     //-------------------------------------------------------------------
     // SimplexJS
@@ -3126,21 +3074,6 @@ Tableau.prototype.checkForCycles = function (varIndexes) {
         this.MultiObjective = function(model){
             return require("./Polyopt")(this, model);
         };
+        
     };
-
-    var define = define || undefined;
-    var window = window || undefined;
-
-    // If the project is loading through require.js, use `define` and exit
-    if (typeof define === "function") {
-        define([], function () {
-            return new Solver();
-        });
-    // If the project doesn't see define, but sees window, put solver on window
-    } else if (typeof window === "object"){
-        window.solver = new Solver();
-    }
-
-    // Ensure that its available in node.js env
-    export default new Solver();
-},{"./Model":1,"./Polyopt":2,"./Reformat":3,"./Tableau/branchAndCut":8,"./Tableau/index.js":12,"./Validation":16,"./expressions.js":17}]},{},[18]);
+}

@@ -15,8 +15,16 @@
     "url": "https://github.com/JWally/jsLPSolver"
   },
   "main": "./src/main",
+  "scripts": {
+    "test": "jest ."
+  },
   "devDependencies": {
+    "@babel/core": "^7.0.1",
+    "@babel/preset-env": "^7.0.0",
+    "babel-core": "^7.0.0-0",
+    "babel-jest": "^23.6.0",
     "benchmark": "^2.1.4",
+    "eslint": "^5.5.0",
     "jest": "^23.6.0",
     "walk": "^2.3.14"
   },
