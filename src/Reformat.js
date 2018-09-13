@@ -11,14 +11,14 @@
 
 
 
- /*************************************************************
- * Method: to_JSON
- * Scope: Public:
- * Agruments: input: Whatever the user gives us
- * Purpose: Convert an unfriendly formatted LP
- *          into something that our library can
- *          work with
- **************************************************************/
+/*************************************************************
+* Method: to_JSON
+* Scope: Public:
+* Agruments: input: Whatever the user gives us
+* Purpose: Convert an unfriendly formatted LP
+*          into something that our library can
+*          work with
+**************************************************************/
 function to_JSON(input){
     var rxo = {
         /* jshint ignore:start */
@@ -207,14 +207,14 @@ function to_JSON(input){
 }
 
 
- /*************************************************************
- * Method: from_JSON
- * Scope: Public:
- * Agruments: model: The model we want solver to operate on
- * Purpose: Convert a friendly JSON model into a model for a
- *          real solving library...in this case
- *          lp_solver
- **************************************************************/
+/*************************************************************
+* Method: from_JSON
+* Scope: Public:
+* Agruments: model: The model we want solver to operate on
+* Purpose: Convert a friendly JSON model into a model for a
+*          real solving library...in this case
+*          lp_solver
+**************************************************************/
 function from_JSON(model){
     // Make sure we at least have a model
     if (!model) {
@@ -285,7 +285,7 @@ function from_JSON(model){
 }
 
 
-module.exports = function (model) {
+export default function (model) {
     // If the user is giving us an array
     // or a string, convert it to a JSON Model
     // otherwise, spit it out as a string

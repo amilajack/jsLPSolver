@@ -189,7 +189,7 @@ Equality.prototype.relax = function (weight, priority) {
 };
 
 
-module.exports = {
+export default {
     Constraint: Constraint,
     Variable: Variable,
     IntegerVariable: IntegerVariable,

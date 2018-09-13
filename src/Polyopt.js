@@ -5,37 +5,37 @@
 /*global console*/
 /*global process*/
 
-    /***************************************************************
-     * Method: polyopt
-     * Scope: private
-     * Agruments:
-     *        model: The model we want solver to operate on.
-                     Because we're in here, we're assuming that
-                     we're solving a multi-objective optimization
-                     problem. Poly-Optimization. polyopt.
+/***************************************************************
+ * Method: polyopt
+ * Scope: private
+ * Agruments:
+ *        model: The model we want solver to operate on.
+                 Because we're in here, we're assuming that
+                 we're solving a multi-objective optimization
+                 problem. Poly-Optimization. polyopt.
 
-                     This model has to be formed a little differently
-                     because it has multiple objective functions.
-                     Normally, a model has 2 attributes: opType (string,
-                     "max" or "min"), and optimize (string, whatever
-                     attribute we're optimizing.
+                 This model has to be formed a little differently
+                 because it has multiple objective functions.
+                 Normally, a model has 2 attributes: opType (string,
+                 "max" or "min"), and optimize (string, whatever
+                 attribute we're optimizing.
 
-                     Now, there is no opType attribute on the model,
-                     and optimize is an object of attributes to be
-                     optimized, and how they're to be optimized.
-                     For example:
+                 Now, there is no opType attribute on the model,
+                 and optimize is an object of attributes to be
+                 optimized, and how they're to be optimized.
+                 For example:
 
-                     ...
-                     "optimize": {
-                        "pancakes": "max",
-                        "cost": "minimize"
-                     }
-                     ...
+                 ...
+                 "optimize": {
+                    "pancakes": "max",
+                    "cost": "minimize"
+                 }
+                 ...
 
 
-     **************************************************************/
+ **************************************************************/
 
-module.exports = function(solver, model){
+export default function(solver, model){
 
     // I have no idea if this is actually works, or what,
     // but here is my algorithm to solve linear programs

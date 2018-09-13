@@ -1,5 +1,5 @@
 /*global require*/
-var Tableau = require("./Tableau.js");
+import Tableau from './Tableau.js';
 
 Tableau.prototype.countIntegerValues = function(){
     var count = 0;

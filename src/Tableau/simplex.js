@@ -5,7 +5,7 @@
 /*global console*/
 /*global process*/
 
-var Tableau = require("./Tableau.js");
+import Tableau from './Tableau.js';
 
 //-------------------------------------------------------------------
 // Function: solve

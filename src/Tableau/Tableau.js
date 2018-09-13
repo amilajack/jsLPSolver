@@ -4,8 +4,9 @@
 /*global it*/
 /*global console*/
 /*global process*/
-var Solution = require("./Solution.js");
-var MilpSolution = require("./MilpSolution.js");
+import Solution from './Solution.js';
+
+import MilpSolution from './MilpSolution.js';
 
 /*************************************************************
  * Class: Tableau
@@ -59,7 +60,7 @@ function Tableau(precision) {
 
     this.branchAndCutIterations = 0;
 }
-module.exports = Tableau;
+export default Tableau;
 
 Tableau.prototype.solve = function () {
     if (this.model.getNumberOfIntegerVariables() > 0) {

@@ -1,5 +1,5 @@
 /*global require*/
-var Tableau = require("./Tableau.js");
+import Tableau from './Tableau.js';
 
 function VariableData(index, value) {
     this.index = index;

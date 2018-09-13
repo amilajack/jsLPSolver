@@ -15,21 +15,19 @@
 // Licensed under the MIT License.
 //-------------------------------------------------------------------
 
-var Tableau = require("./Tableau/index.js");
-var Model = require("./Model");
-var branchAndCut = require("./Tableau/branchAndCut");
-var expressions = require("./expressions.js");
-var validation = require("./Validation");
-var Constraint = expressions.Constraint;
-var Variable = expressions.Variable;
-var Numeral = expressions.Numeral;
-var Term = expressions.Term;
+import Tableau from './Tableau/index.js';
+
+import Model from './Model';
+import branchAndCut from './Tableau/branchAndCut';
+import expressions from './expressions.js';
+import validation from './Validation';
+const Constraint = expressions.Constraint;
+const Variable = expressions.Variable;
+const Numeral = expressions.Numeral;
+const Term = expressions.Term;
 
 // Place everything under the Solver Name Space
-var Solver = function () {
-
-    "use strict";
-
+const Solver = function () {
     this.Model = Model;
     this.branchAndCut = branchAndCut;
     this.Constraint = Constraint;
@@ -59,7 +57,7 @@ var Solver = function () {
         // if the model doesn't have a validate
         // attribute set to false
         if(validate){
-            for(var test in validation){
+            for(const test in validation){
                 model = validation[test](model);
             }
         }
@@ -73,7 +71,7 @@ var Solver = function () {
             model = new Model(precision).loadJson(model);
         }
 
-        var solution = model.solve();
+        const solution = model.solve();
         this.lastSolvedModel = model;
         solution.solutionSet = solution.generateSolutionSet();
 
@@ -86,7 +84,7 @@ var Solver = function () {
             // Otherwise; give the user the bare
             // minimum of info necessary to carry on
 
-            var store = {};
+            const store = {};
 
             // 1.) Add in feasibility to store;
             store.feasible = solution.feasible;
@@ -98,7 +96,7 @@ var Solver = function () {
 
             // 3.) Load all of the variable values
             Object.keys(solution.solutionSet)
-                .map(function (d) {
+                .map(d => {
                     store[d] = solution.solutionSet[d];
                 });
 
@@ -118,57 +116,56 @@ var Solver = function () {
     this.ReformatLP = require("./Reformat");
 
 
-     /*************************************************************
-     * Method: MultiObjective
-     * Scope: Public:
-     * Agruments:
-     *        model: The model we want solver to operate on
-     *        detail: if false, or undefined; it will return the
-     *                result of using the mid-point formula; otherwise
-     *                it will return an object containing:
-     *
-     *                1. The results from the mid point formula
-     *                2. The solution for each objective solved
-     *                   in isolation (pareto)
-     *                3. The min and max of each variable along
-     *                   the frontier of the polytope (ranges)
-     * Purpose: Solve a model with multiple objective functions.
-     *          Since a potential infinite number of solutions exist
-     *          this naively returns the mid-point between
-     *
-     * Note: The model has to be changed a little to work with this.
-     *       Before an *opType* was required. No more. The objective
-     *       attribute of the model is now an object instead of a
-     *       string.
-     *
-     *  *EXAMPLE MODEL*
-     *
-     *   model = {
-     *       optimize: {scotch: "max", soda: "max"},
-     *       constraints: {fluid: {equal: 100}},
-     *       variables: {
-     *           scotch: {fluid: 1, scotch: 1},
-     *           soda: {fluid: 1, soda: 1}
-     *       }
-     *   }
-     *
-     **************************************************************/
+    /*************************************************************
+    * Method: MultiObjective
+    * Scope: Public:
+    * Agruments:
+    *        model: The model we want solver to operate on
+    *        detail: if false, or undefined; it will return the
+    *                result of using the mid-point formula; otherwise
+    *                it will return an object containing:
+    *
+    *                1. The results from the mid point formula
+    *                2. The solution for each objective solved
+    *                   in isolation (pareto)
+    *                3. The min and max of each variable along
+    *                   the frontier of the polytope (ranges)
+    * Purpose: Solve a model with multiple objective functions.
+    *          Since a potential infinite number of solutions exist
+    *          this naively returns the mid-point between
+    *
+    * Note: The model has to be changed a little to work with this.
+    *       Before an *opType* was required. No more. The objective
+    *       attribute of the model is now an object instead of a
+    *       string.
+    *
+    *  *EXAMPLE MODEL*
+    *
+    *   model = {
+    *       optimize: {scotch: "max", soda: "max"},
+    *       constraints: {fluid: {equal: 100}},
+    *       variables: {
+    *           scotch: {fluid: 1, scotch: 1},
+    *           soda: {fluid: 1, soda: 1}
+    *       }
+    *   }
+    *
+    **************************************************************/
     this.MultiObjective = function(model){
         return require("./Polyopt")(this, model);
     };
 };
 
-var define = define || undefined;
-var window = window || undefined;
+const define = define || undefined;
+const window = window || undefined;
 
 // If the project is loading through require.js, use `define` and exit
 if (typeof define === "function") {
-    define([], function () {
-        return new Solver();
-    });
+    define([], () => new Solver());
 // If the project doesn't see define, but sees window, put solver on window
 } else if (typeof window === "object"){
     window.solver = new Solver();
 }
+
 // Ensure that its available in node.js env
-module.exports = new Solver();
+export default new Solver();

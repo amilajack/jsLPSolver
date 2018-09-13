@@ -3,19 +3,20 @@
 /*global it*/
 /*global console*/
 
-var assert = require("assert");
-var walk = require("walk");
-var fs = require("fs");
+import assert from 'assert';
 
-var problems = [];
+import walk from 'walk';
+import fs from 'fs';
+
+const problems = [];
 
 // Parsing test problems
-var walker = walk.walkSync("test/problems", {
+const walker = walk.walkSync("test/problems", {
     followLinks: false,
     listeners: {
-        file: function (root, fileStats) {
+        file(root, fileStats) {
             // Add this file to the list of files
-            var fileName = fileStats.name;
+            const fileName = fileStats.name;
             console.log("fileName", fileName);
 
             // Ignore files that start with a "."
@@ -23,9 +24,9 @@ var walker = walk.walkSync("test/problems", {
                 return;
             }
 
-            var fileRoot = root.substr("test/problems".length + 1);
-            var fullFilePath = "./" + root + "/" + fileName;
-            var jsonContent = JSON.parse(fs.readFileSync(fullFilePath));
+            const fileRoot = root.substr("test/problems".length + 1);
+            const fullFilePath = `./${root}/${fileName}`;
+            const jsonContent = JSON.parse(fs.readFileSync(fullFilePath));
             problems.push(jsonContent);
         }
     }
@@ -35,7 +36,6 @@ var walker = walk.walkSync("test/problems", {
 //problems.splice(-1,1);
 
 function assertSolution(model, solutionA, solutionB) {
-
     // If the problem is feasible but the solution isn't then failure
     // Else if they are both unfeasible then success
     if (solutionA.feasible !== solutionB.feasible){
@@ -44,8 +44,8 @@ function assertSolution(model, solutionA, solutionB) {
         return assert.deepEqual({ feasible: solutionA.feasible }, { feasible: solutionB.feasible });
     }
 
-    var solutionAIsBounded = solutionA.bounded === undefined ? true : solutionA.bounded;
-    var solutionBIsBounded = solutionB.bounded === undefined ? true : solutionB.bounded;
+    const solutionAIsBounded = solutionA.bounded === undefined ? true : solutionA.bounded;
+    const solutionBIsBounded = solutionB.bounded === undefined ? true : solutionB.bounded;
     if (solutionAIsBounded !== solutionBIsBounded){
         return assert.deepEqual({ bounded: solutionAIsBounded }, { bounded: solutionBIsBounded });
     } else if (!solutionAIsBounded) {
@@ -61,17 +61,14 @@ function assertSolution(model, solutionA, solutionB) {
     }
 
     // More accurate way to compute the adequate precision ?
-    var precision = 1e-6;
-    var tableau = model.tableau;
+    const precision = 1e-6;
+    const tableau = model.tableau;
 
     // Check if all the constraints are respected
-    for (var cstIndex = 0; cstIndex < model.constraints.length; cstIndex += 1) {
-        var constraint = model.constraints[cstIndex];
+    for (const constraint of model.constraints) {
+        let lhs = 0;
 
-        var lhs = 0;
-        for (var termIndex = 0; termIndex < constraint.terms.length; termIndex += 1) {
-            var term = constraint.terms[termIndex];
-
+        for (const term of constraint.terms) {
             lhs += term.variable.value * term.coefficient;
         }
 
@@ -87,13 +84,13 @@ function assertSolution(model, solutionA, solutionB) {
 
 // Build out our test suite
 describe("The Solve method takes a problem and solves it",
-    function () {
-        var solver = require("../src/solver");
+    () => {
+        const solver = require("../src/solver");
         // Iterate over each problem in the suite
-        problems.forEach(function (jsonModel) {
+        problems.forEach(jsonModel => {
             // Generic "Should" Statement
             // (should come up with a better test scheme and description...)
-            it("should be able to solve the " + jsonModel.name,
+            it(`should be able to solve the ${jsonModel.name}`,
                 function () {
                     // Look to see if the JSON Model's "expects"
                     // has a "_timeout". If so, set it and delete it (to not
@@ -106,10 +103,11 @@ describe("The Solve method takes a problem and solves it",
 
                     // Each problem has its correct answer attached to its
                     // JSON as an "expects" object
-                    var expectedResult = jsonModel.expects,
-                        obtainedResult = solver.Solve(jsonModel);
+                    const expectedResult = jsonModel.expects;
 
-                    var model = solver.lastSolvedModel;
+                    const obtainedResult = solver.Solve(jsonModel);
+
+                    const model = solver.lastSolvedModel;
 
                     // Compare what we expect the problem to be
                     // to what solver comes up with

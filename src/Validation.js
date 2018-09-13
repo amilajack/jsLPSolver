@@ -12,7 +12,7 @@
 // return a functional LPSolve JSON style
 // model or throw an error
 
-exports.CleanObjectiveAttributes = function(model){
+export const CleanObjectiveAttributes = function(model){
   // Test to see if the objective attribute
   // is also used by one of the constraints
   //

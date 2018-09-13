@@ -1,5 +1,5 @@
 /*global require*/
-var Tableau = require("./Tableau.js");
+import Tableau from './Tableau.js';
 
 Tableau.prototype.copy = function () {
     var copy = new Tableau(this.precision);

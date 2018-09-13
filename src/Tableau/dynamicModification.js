@@ -1,6 +1,6 @@
 /*global require*/
 /*global console*/
-var Tableau = require("./Tableau.js");
+import Tableau from './Tableau.js';
 
 //-------------------------------------------------------------------
 //-------------------------------------------------------------------

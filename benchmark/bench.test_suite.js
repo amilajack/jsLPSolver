@@ -6,19 +6,20 @@
 
 
 
-var walk = require("walk");
-var fs = require("fs");
-var solver = require("../src/solver");
+import walk from 'walk';
 
-var problems = [];
+import fs from 'fs';
+import solver from '../src/solver';
+
+const problems = [];
 
 // Parsing test problems
-var walker = walk.walkSync("../test/problems", {
+const walker = walk.walkSync("../test/problems", {
     followLinks: false,
     listeners: {
-        file: function (root, fileStats) {
+        file(root, fileStats) {
             // Add this file to the list of files
-            var fileName = fileStats.name;
+            const fileName = fileStats.name;
             console.log("fileName", fileName);
 
             // Ignore files that start with a "."
@@ -26,9 +27,9 @@ var walker = walk.walkSync("../test/problems", {
                 return;
             }
 
-            var fileRoot = root.substr("test/problems".length + 1);
-            var fullFilePath = "./" + root + "/" + fileName;
-            var jsonContent = JSON.parse(fs.readFileSync(fullFilePath));
+            const fileRoot = root.substr("test/problems".length + 1);
+            const fullFilePath = `./${root}/${fileName}`;
+            const jsonContent = JSON.parse(fs.readFileSync(fullFilePath));
             problems.push(jsonContent);
         }
     }
@@ -40,42 +41,40 @@ console.log("------------------------");
 console.log("-FORWARD-");
 console.log("------------------------");
 
-var log = {};
+const log = {};
 
 
 for (var i = 0; i < problems.length; i++) {
+    const k = 0;
+    var j = problems[i];
 
-    var k = 0,
-        j = problems[i];
 
+    log[j.name] = {};
 
-        log[j.name] = {};
-
-        for(var constraint in j.constraints){
-            if(j.constraints[constraint].max){
-                log[j.name].constraints = log[j.name].constraints  || 0;
-                log[j.name].constraints++;
-            }
-
-            if(j.constraints[constraint].min){
-                log[j.name].constraints = log[j.name].constraints  || 0;
-                log[j.name].constraints++;
-            }
+    for(const constraint in j.constraints){
+        if(j.constraints[constraint].max){
+            log[j.name].constraints = log[j.name].constraints  || 0;
+            log[j.name].constraints++;
         }
 
-        log[j.name].variables = Object.keys(j.variables).length;
-
-        if(j.ints){
-            log[j.name].ints = Object.keys(j.ints).length;
+        if(j.constraints[constraint].min){
+            log[j.name].constraints = log[j.name].constraints  || 0;
+            log[j.name].constraints++;
         }
+    }
 
+    log[j.name].variables = Object.keys(j.variables).length;
+
+    if(j.ints){
+        log[j.name].ints = Object.keys(j.ints).length;
+    }
 }
 
 for( i = 0; i < problems.length; i++){
     j = problems[i];
-    var date_0 = process.hrtime();
-    var d = solver.Solve(j, 1e-8, true);
-    var a = process.hrtime(date_0);
+    const date_0 = process.hrtime();
+    const d = solver.Solve(j, 1e-8, true);
+    const a = process.hrtime(date_0);
 
     log[j.name] = d;
     log[j.name].time =  a[0] + a[1] / 1e9;

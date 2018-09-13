@@ -1,4 +1,4 @@
-module.exports = function(grunt){
+export default function(grunt){
     grunt.initConfig({
         "pkg": "package.json",
         "jshint": {
@@ -45,4 +45,4 @@ module.exports = function(grunt){
     grunt.registerTask("speed", function(){require("./benchmark/bench.test_suite");});
     grunt.registerTask("prod", ["jshint","mochaTest","browserify"]);
 
-}
+};

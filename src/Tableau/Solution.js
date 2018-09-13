@@ -6,7 +6,7 @@ function Solution(tableau, evaluation, feasible, bounded) {
     this.bounded = bounded;
     this._tableau = tableau;
 }
-module.exports = Solution;
+export default Solution;
 
 Solution.prototype.generateSolutionSet = function () {
     var solutionSet = {};

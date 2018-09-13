@@ -5,27 +5,28 @@
 /*global console*/
 /*global process*/
 
-var assert = require("assert");
-var JSLP = require("../src/solver");
-var Model = JSLP.Model;
+import assert from 'assert';
 
-describe("Testing Function API", function () {
+import JSLP from '../src/solver';
+const Model = JSLP.Model;
 
-    it("should be able to construct and solve model 1", function () {
+describe("Testing Function API", () => {
+
+    it("should be able to construct and solve model 1", () => {
         //-------------------------------------------
         // MODEL 1
         //-------------------------------------------
-        var model1 = new Model(1e-8, "model 1").maximize();
+        const model1 = new Model(1e-8, "model 1").maximize();
 
-        var x1 = model1.addVariable(-4, "x1");
-        var x2 = model1.addVariable(-2, "x2");
-        var x3 = model1.addVariable( 1, "x3");
+        const x1 = model1.addVariable(-4, "x1");
+        const x2 = model1.addVariable(-2, "x2");
+        const x3 = model1.addVariable( 1, "x3");
 
-        var cst1 = model1.smallerThan(-3).addTerm(-1, x1).addTerm(-1, x2).addTerm( 2, x3);
-        var cst2 = model1.smallerThan(-4).addTerm(-4, x1).addTerm(-2, x2).addTerm( 1, x3);
+        const cst1 = model1.smallerThan(-3).addTerm(-1, x1).addTerm(-1, x2).addTerm( 2, x3);
+        let cst2 = model1.smallerThan(-4).addTerm(-4, x1).addTerm(-2, x2).addTerm( 1, x3);
         cst2 = model1.smallerThan( 2).addTerm( 1, x1).addTerm( 1, x2).addTerm(-4, x3);
 
-        var solution1 = model1.solve();
+        const solution1 = model1.solve();
         assert.deepEqual(solution1.evaluation, -7.5);
         assert.deepEqual(x1.value, 0);
         assert.deepEqual(x2.value, 4);
@@ -33,19 +34,19 @@ describe("Testing Function API", function () {
     });
 
 
-    it("should be able to construct and solve model 2", function () {
+    it("should be able to construct and solve model 2", () => {
         //-------------------------------------------
         // MODEL 2
         //-------------------------------------------
-        var model2 = new Model(1e-8, "model 2").minimize();
+        const model2 = new Model(1e-8, "model 2").minimize();
 
-        var x1 = model2.addVariable(3);
-        var x2 = model2.addVariable(2);
+        const x1 = model2.addVariable(3);
+        const x2 = model2.addVariable(2);
 
-        var cst1 = model2.greaterThan(3).addTerm(1, x1).addTerm(1, x2);
-        var cst2 = model2.greaterThan(4).addTerm(2, x1).addTerm(1, x2);
+        const cst1 = model2.greaterThan(3).addTerm(1, x1).addTerm(1, x2);
+        const cst2 = model2.greaterThan(4).addTerm(2, x1).addTerm(1, x2);
 
-        var solution2 = model2.solve();
+        const solution2 = model2.solve();
         assert.deepEqual(solution2.evaluation, 7);
         assert.deepEqual(x1.value, 1);
         assert.deepEqual(x2.value, 2);
