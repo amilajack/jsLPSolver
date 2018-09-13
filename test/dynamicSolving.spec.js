@@ -1,12 +1,4 @@
-/*global describe*/
-/*global require*/
-/*global module*/
-/*global it*/
-/*global console*/
-/*global process*/
-
 import assert from 'assert';
-
 import JSLP from '../src/solver';
 const Model = JSLP.Model;
 

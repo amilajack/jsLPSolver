@@ -1,8 +1,3 @@
-/*global describe*/
-/*global require*/
-/*global it*/
-/*global console*/
-
 import assert from 'assert';
 
 import walk from 'walk';

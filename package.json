@@ -16,15 +16,9 @@
   },
   "main": "./src/main",
   "devDependencies": {
-    "benchmark": "*",
-    "mocha": "3.1.2",
-    "grunt": "*",
-    "grunt-browserify": "^4.0.1",
-    "grunt-contrib-jshint": "~0.9",
-    "grunt-contrib-uglify": "*",
-    "grunt-jsbeautifier": "*",
-    "grunt-mocha-test": "*",
-    "walk": "*"
+    "benchmark": "^2.1.4",
+    "jest": "^23.6.0",
+    "walk": "^2.3.14"
   },
   "keywords": [
     "Linear",
