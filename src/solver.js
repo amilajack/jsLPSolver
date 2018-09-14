@@ -2869,7 +2869,7 @@ Equality.prototype.relax = function (weight, priority) {
 };
 
 
-const foo = {
+const bar = {
   Constraint: Constraint,
    Variable: Variable,
    IntegerVariable: IntegerVariable,
