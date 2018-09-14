@@ -25,6 +25,7 @@
     "babel-jest": "^23.6.0",
     "benchmark": "^2.1.4",
     "eslint": "^5.5.0",
+    "eslint-config-bliss": "^2.3.0",
     "jest": "^23.6.0",
     "walk": "^2.3.14"
   },
