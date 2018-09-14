@@ -42,7 +42,7 @@ export default function(grunt){
     grunt.loadNpmTasks("grunt-browserify");
     grunt.registerTask("default", ["jshint"]);
     grunt.registerTask("test", ["jshint","mochaTest"]);
-    grunt.registerTask("speed", function(){require("./benchmark/bench.test_suite");});
+    grunt.registerTask("speed", () => {require("./benchmark/bench.test_suite");});
     grunt.registerTask("prod", ["jshint","mochaTest","browserify"]);
 
 };

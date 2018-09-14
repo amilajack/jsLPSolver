@@ -68,7 +68,9 @@ Tableau.prototype.restore = function () {
     this.height = save.height;
 
     // Restoring matrix
-    var r, c;
+    var r;
+
+    var c;
     for (r = 0; r < this.height; r += 1) {
         var savedRow = savedMatrix[r];
         var row = this.matrix[r];

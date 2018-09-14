@@ -93,9 +93,7 @@ Tableau.prototype.setOptionalObjective = function (priority, column, cost) {
         objectiveForPriority = new OptionalObjective(priority, nColumns);
         this.objectivesByPriority[priority] = objectiveForPriority;
         this.optionalObjectives.push(objectiveForPriority);
-        this.optionalObjectives.sort(function (a, b) {
-            return a.priority - b.priority;
-        });
+        this.optionalObjectives.sort((a, b) => a.priority - b.priority);
     }
 
     objectiveForPriority.reducedCosts[column] = cost;
@@ -142,7 +140,8 @@ Tableau.prototype._resetMatrix = function () {
     var nVars = variables.length;
     var nConstraints = constraints.length;
 
-    var v, varIndex;
+    var v;
+    var varIndex;
     var costRow = this.matrix[0];
     var coeff = (this.model.isMinimization === true) ? -1 : 1;
     for (v = 0; v < nVars; v += 1) {
@@ -170,7 +169,9 @@ Tableau.prototype._resetMatrix = function () {
         this.colByVarIndex[constraintIndex] = -1;
         this.varIndexByRow[rowIndex] = constraintIndex;
 
-        var t, term, column;
+        var t;
+        var term;
+        var column;
         var terms = constraint.terms;
         var nTerms = terms.length;
         var row = this.matrix[rowIndex++];

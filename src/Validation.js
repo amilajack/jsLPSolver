@@ -12,15 +12,17 @@
 // return a functional LPSolve JSON style
 // model or throw an error
 
-export const CleanObjectiveAttributes = function(model){
-  // Test to see if the objective attribute
-  // is also used by one of the constraints
-  //
-  // If so...create a new attribute on each
-  // variable
-    var fakeAttr,
-        x, z;
-  
+export const CleanObjectiveAttributes = model => {
+    // Test to see if the objective attribute
+    // is also used by one of the constraints
+    //
+    // If so...create a new attribute on each
+    // variable
+    var fakeAttr;
+
+    var x;
+    var z;
+
     if(typeof model.optimize === "string"){
         if(model.constraints[model.optimize]){
             // Create the new attribute

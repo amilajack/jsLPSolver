@@ -181,10 +181,10 @@ Equality.prototype.relax = function (weight, priority) {
 
 
 export default {
-    Constraint: Constraint,
-    Variable: Variable,
-    IntegerVariable: IntegerVariable,
-    SlackVariable: SlackVariable,
-    Equality: Equality,
-    Term: Term
+    Constraint,
+    Variable,
+    IntegerVariable,
+    SlackVariable,
+    Equality,
+    Term
 };

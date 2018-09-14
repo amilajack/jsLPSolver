@@ -39,20 +39,28 @@ function to_JSON(input){
         "get_num": /(\-|\+){0,1}(\W|^)\d+\.{0,1}\d{0,}/g, // Why accepting character \W before the first digit?
         "get_word": /[A-Za-z].*/
         /* jshint ignore:end */
-    },
-    model = {
+    };
+
+    var model = {
         "opType": "",
         "optimize": "_obj",
         "constraints": {},
         "variables": {}
-    },
-    constraints = {
+    };
+
+    var constraints = {
         ">=": "min",
         "<=": "max",
         "=": "equal"
-    },
-    tmp = "", tst = 0, ary = null, hldr = "", hldr2 = "",
-    constraint = "", rhs = 0;
+    };
+
+    var tmp = "";
+    var tst = 0;
+    var ary = null;
+    var hldr = "";
+    var hldr2 = "";
+    var constraint = "";
+    var rhs = 0;
 
     // Handle input if its coming
     // to us as a hard string
@@ -83,15 +91,13 @@ function to_JSON(input){
             model.opType = tmp.match(/(max|min)/gi)[0];
 
             // Pull apart lhs
-            ary = tmp.match(rxo.parse_lhs).map(function(d){
-                return d.replace(/\s+/,"");
-            }).slice(1);
+            ary = tmp.match(rxo.parse_lhs).map(d => d.replace(/\s+/,"")).slice(1);
 
 
 
             // *** STEP 1 *** ///
             // Get the variables out
-            ary.forEach(function(d){
+            ary.forEach(d => {
 
                 // Get the number if its there
                 hldr = d.match(rxo.get_num);
@@ -126,7 +132,7 @@ function to_JSON(input){
             // Since we have an int, our model should too
             model.ints = model.ints || {};
 
-            ary.forEach(function(d){
+            ary.forEach(d => {
                 d = d.replace(";","");
                 model.ints[d] = 1;
             });
@@ -138,7 +144,7 @@ function to_JSON(input){
             // Since we have an binary, our model should too
             model.binaries = model.binaries || {};
 
-            ary.forEach(function(d){
+            ary.forEach(d => {
                 d = d.replace(";","");
                 model.binaries[d] = 1;
             });
@@ -148,13 +154,11 @@ function to_JSON(input){
             var constraintExpression = (separatorIndex === -1) ? tmp : tmp.slice(separatorIndex + 1);
 
             // Pull apart lhs
-            ary = constraintExpression.match(rxo.parse_lhs).map(function(d){
-                return d.replace(/\s+/,"");
-            });
+            ary = constraintExpression.match(rxo.parse_lhs).map(d => d.replace(/\s+/,""));
 
             // *** STEP 1 *** ///
             // Get the variables out
-            ary.forEach(function(d){
+            ary.forEach(d => {
                 // Get the number if its there
                 hldr = d.match(rxo.get_num);
 
@@ -197,7 +201,7 @@ function to_JSON(input){
             // Since we have an int, our model should too
             model.unrestricted = model.unrestricted || {};
 
-            ary.forEach(function(d){
+            ary.forEach(d => {
                 d = d.replace(";","");
                 model.unrestricted[d] = 1;
             });
@@ -221,15 +225,17 @@ function from_JSON(model){
         throw new Error("Solver requires a model to operate on");
     }
 
-    var output = "",
-        ary = [],
-        norm = 1,
-        lookup = {
-            "max": "<=",
-            "min": ">=",
-            "equal": "="
-        },
-        rxClean = new RegExp("[^A-Za-z0-9]+", "gi");
+    var output = "";
+    var ary = [];
+    var norm = 1;
+
+    var lookup = {
+        "max": "<=",
+        "min": ">=",
+        "equal": "="
+    };
+
+    var rxClean = new RegExp("[^A-Za-z0-9]+", "gi");
 
     // Build the objective statement
     output += model.opType + ":";

@@ -24,22 +24,22 @@ Tableau.prototype.log = function (message, force) {
     var digitPrecision = 5;
 
     // Variable declaration
-    var varNameRowString = "",
-        spacePerColumn = [" "],
-        j,
-        c,
-        s,
-        r,
-        variable,
-        varIndex,
-        varName,
-        varNameLength,
-        nSpaces,
-        valueSpace,
-        nameSpace;
+    var varNameRowString = "";
 
-    var row,
-        rowString;
+    var spacePerColumn = [" "];
+    var j;
+    var c;
+    var s;
+    var r;
+    var variable;
+    var varIndex;
+    var varName;
+    var varNameLength;
+    var nSpaces;
+    var valueSpace;
+    var nameSpace;
+    var row;
+    var rowString;
 
     for (c = 1; c < this.width; c += 1) {
         varIndex = this.varIndexByCol[c];

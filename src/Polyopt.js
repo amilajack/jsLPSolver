@@ -36,7 +36,6 @@
  **************************************************************/
 
 export default function(solver, model){
-
     // I have no idea if this is actually works, or what,
     // but here is my algorithm to solve linear programs
     // with multiple objective functions
@@ -49,16 +48,21 @@ export default function(solver, model){
     //    representing this)
     // 4. Find the mid-point between all vertices by doing the
     //    following (a_1 + a_2 ... a_n) / n;
-    var objectives = model.optimize,
-        new_constraints = JSON.parse(JSON.stringify(model.optimize)),
-        keys = Object.keys(model.optimize),
-        tmp,
-        counter = 0,
-        vectors = {},
-        vector_key = "",
-        obj = {},
-        pareto = [],
-        i,j,x,y,z;
+    var objectives = model.optimize;
+
+    var new_constraints = JSON.parse(JSON.stringify(model.optimize));
+    var keys = Object.keys(model.optimize);
+    var tmp;
+    var counter = 0;
+    var vectors = {};
+    var vector_key = "";
+    var obj = {};
+    var pareto = [];
+    var i;
+    var j;
+    var x;
+    var y;
+    var z;
 
     // Delete the optimize object from the model
     delete model.optimize;
@@ -159,14 +163,14 @@ export default function(solver, model){
     for(i in model.variables){
         model.variables[i].cheater = 1;
     }
-    
+
     // Build out the object with all attributes
     for(i in pareto){
         for(x in pareto[i]){
             obj[x] = obj[x] || {min: 1e99, max: -1e99};
         }
     }
-    
+
     // Give each pareto a full attribute list
     // while getting the max and min values
     // for each attribute
@@ -187,11 +191,10 @@ export default function(solver, model){
     }
     // Solve the model for the midpoints
     tmp =  solver.Solve(model, undefined, undefined, true);
-    
+
     return {
         midpoint: tmp,
         vertices: pareto,
         ranges: obj
-    };    
-
+    };
 };

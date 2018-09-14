@@ -135,7 +135,8 @@ Tableau.prototype.phase2 = function () {
     var optionalCostsColumns = null;
 
     var iterations = 0;
-    var reducedCost, unrestricted;
+    var reducedCost;
+    var unrestricted;
 
     while (true) {
         var costRow = matrix[this.costRowIndex];
@@ -319,7 +320,10 @@ Tableau.prototype.pivot = function (pivotRowIndex, pivotColumnIndex) {
     // set the value in the pivot column = 0 by
     // multiplying the value of all elements in the objective
     // row by ... yuck... just look below; better explanation later
-    var coefficient, i, v0;
+    var coefficient;
+
+    var i;
+    var v0;
     var precision = this.precision;
     for (var r = 0; r <= lastRow; r++) {
         var row = matrix[r];
@@ -365,7 +369,7 @@ Tableau.prototype.pivot = function (pivotRowIndex, pivotColumnIndex) {
 
 
 
-Tableau.prototype.checkForCycles = function (varIndexes) {
+Tableau.prototype.checkForCycles = varIndexes => {
     for (var e1 = 0; e1 < varIndexes.length - 1; e1++) {
         for (var e2 = e1 + 1; e2 < varIndexes.length; e2++) {
             var elt1 = varIndexes[e1];

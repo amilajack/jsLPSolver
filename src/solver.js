@@ -878,7 +878,7 @@ Solution.prototype.generateSolutionSet = function () {
     return solutionSet;
 };
 
-import MilpSolution from './Tableau/MilpSolution';
+import MilpSolution_ from './Tableau/MilpSolution';
 
 /*************************************************************
  * Class: Tableau
@@ -1122,7 +1122,7 @@ Tableau.prototype.getSolution = function () {
         this.evaluation : -this.evaluation;
 
     if (this.model.getNumberOfIntegerVariables() > 0) {
-        return new MilpSolution(this, evaluation, this.feasible, this.bounded, this.branchAndCutIterations);
+        return new MilpSolution_(this, evaluation, this.feasible, this.bounded, this.branchAndCutIterations);
     } else {
         return new Solution(this, evaluation, this.feasible, this.bounded);
     }
