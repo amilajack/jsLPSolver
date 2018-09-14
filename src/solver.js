@@ -1,1140 +1,1133 @@
-var Tableau = require("./Tableau/Tableau.js");
-    var branchAndCut = require("./Tableau/branchAndCut.js");
-    var expressions = require("./expressions.js");
-    var Constraint = expressions.Constraint;
-    var Equality = expressions.Equality;
-    var Variable = expressions.Variable;
-    var IntegerVariable = expressions.IntegerVariable;
-    var Term = expressions.Term;
 
-    /*************************************************************
-     * Class: Model
-     * Description: Holds the model of a linear optimisation problem
-     **************************************************************/
-    function Model(precision, name) {
-        this.tableau = new Tableau(precision);
+import Tableau_ from './Tableau/Tableau'
+import branchAndCut from './Tableau/branchAndCut';
+import expressions from './expressions';
 
-        this.name = name;
+var Constraint = expressions.Constraint;
+var Equality = expressions.Equality;
+var Variable = expressions.Variable;
+var IntegerVariable = expressions.IntegerVariable;
+var Term = expressions.Term;
 
-        this.variables = [];
+/*************************************************************
+ * Class: Model
+ * Description: Holds the model of a linear optimisation problem
+ **************************************************************/
+function Model(precision, name) {
+    this.tableau = new Tableau_(precision);
 
-        this.integerVariables = [];
+    this.name = name;
 
-        this.unrestrictedVariables = {};
+    this.variables = [];
 
-        this.constraints = [];
+    this.integerVariables = [];
 
-        this.nConstraints = 0;
+    this.unrestrictedVariables = {};
 
-        this.nVariables = 0;
+    this.constraints = [];
 
-        this.isMinimization = true;
+    this.nConstraints = 0;
 
-        this.tableauInitialized = false;
-        this.relaxationIndex = 1;
+    this.nVariables = 0;
 
-        this.useMIRCuts = true;
+    this.isMinimization = true;
 
-        this.checkForCycles = false;
+    this.tableauInitialized = false;
+    this.relaxationIndex = 1;
+
+    this.useMIRCuts = true;
+
+    this.checkForCycles = false;
+}
+
+Model.prototype.minimize = function () {
+    this.isMinimization = true;
+    return this;
+};
+
+Model.prototype.maximize = function () {
+    this.isMinimization = false;
+    return this;
+};
+
+// Model.prototype.addConstraint = function (constraint) {
+//     // TODO: make sure that the constraint does not belong do another model
+//     // and make
+//     this.constraints.push(constraint);
+//     return this;
+// };
+
+Model.prototype._getNewElementIndex = function () {
+    if (this.availableIndexes.length > 0) {
+        return this.availableIndexes.pop();
     }
 
-    Model.prototype.minimize = function () {
-        this.isMinimization = true;
-        return this;
-    };
+    var index = this.lastElementIndex;
+    this.lastElementIndex += 1;
+    return index;
+};
 
-    Model.prototype.maximize = function () {
-        this.isMinimization = false;
-        return this;
-    };
+Model.prototype._addConstraint = function (constraint) {
+    var slackVariable = constraint.slack;
+    this.tableau.variablesPerIndex[slackVariable.index] = slackVariable;
+    this.constraints.push(constraint);
+    this.nConstraints += 1;
+    if (this.tableauInitialized === true) {
+        this.tableau.addConstraint(constraint);
+    }
+};
 
-    // Model.prototype.addConstraint = function (constraint) {
-    //     // TODO: make sure that the constraint does not belong do another model
-    //     // and make
-    //     this.constraints.push(constraint);
-    //     return this;
-    // };
+Model.prototype.smallerThan = function (rhs) {
+    var constraint = new Constraint(rhs, true, this.tableau.getNewElementIndex(), this);
+    this._addConstraint(constraint);
+    return constraint;
+};
 
-    Model.prototype._getNewElementIndex = function () {
-        if (this.availableIndexes.length > 0) {
-            return this.availableIndexes.pop();
-        }
+Model.prototype.greaterThan = function (rhs) {
+    var constraint = new Constraint(rhs, false, this.tableau.getNewElementIndex(), this);
+    this._addConstraint(constraint);
+    return constraint;
+};  
 
-        var index = this.lastElementIndex;
-        this.lastElementIndex += 1;
-        return index;
-    };
+Model.prototype.equal = function (rhs) {
+    var constraintUpper = new Constraint(rhs, true, this.tableau.getNewElementIndex(), this);
+    this._addConstraint(constraintUpper);
 
-    Model.prototype._addConstraint = function (constraint) {
-        var slackVariable = constraint.slack;
-        this.tableau.variablesPerIndex[slackVariable.index] = slackVariable;
-        this.constraints.push(constraint);
-        this.nConstraints += 1;
-        if (this.tableauInitialized === true) {
-            this.tableau.addConstraint(constraint);
-        }
-    };
+    var constraintLower = new Constraint(rhs, false, this.tableau.getNewElementIndex(), this);
+    this._addConstraint(constraintLower);
 
-    Model.prototype.smallerThan = function (rhs) {
-        var constraint = new Constraint(rhs, true, this.tableau.getNewElementIndex(), this);
-        this._addConstraint(constraint);
-        return constraint;
-    };
+    return new Equality(constraintUpper, constraintLower);
+};
 
-    Model.prototype.greaterThan = function (rhs) {
-        var constraint = new Constraint(rhs, false, this.tableau.getNewElementIndex(), this);
-        this._addConstraint(constraint);
-        return constraint;
-    };
-
-    Model.prototype.equal = function (rhs) {
-        var constraintUpper = new Constraint(rhs, true, this.tableau.getNewElementIndex(), this);
-        this._addConstraint(constraintUpper);
-
-        var constraintLower = new Constraint(rhs, false, this.tableau.getNewElementIndex(), this);
-        this._addConstraint(constraintLower);
-
-        return new Equality(constraintUpper, constraintLower);
-    };
-
-    Model.prototype.addVariable = function (cost, id, isInteger, isUnrestricted, priority) {
-        if (typeof priority === "string") {
-            switch (priority) {
-            case "required":
-                priority = 0;
-                break;
-            case "strong":
-                priority = 1;
-                break;
-            case "medium":
-                priority = 2;
-                break;
-            case "weak":
-                priority = 3;
-                break;
-            default:
-                priority = 0;
-                break;
-            }
-        }
-
-        var varIndex = this.tableau.getNewElementIndex();
-        if (id === null || id === undefined) {
-            id = "v" + varIndex;
-        }
-
-        if (cost === null || cost === undefined) {
-            cost = 0;
-        }
-
-        if (priority === null || priority === undefined) {
+Model.prototype.addVariable = function (cost, id, isInteger, isUnrestricted, priority) {
+    if (typeof priority === "string") {
+        switch (priority) {
+        case "required":
             priority = 0;
+            break;
+        case "strong":
+            priority = 1;
+            break;
+        case "medium":
+            priority = 2;
+            break;
+        case "weak":
+            priority = 3;
+            break;
+        default:
+            priority = 0;
+            break;
         }
+    }
 
-        var variable;
-        if (isInteger) {
-            variable = new IntegerVariable(id, cost, varIndex, priority);
-            this.integerVariables.push(variable);
-        } else {
-            variable = new Variable(id, cost, varIndex, priority);
-        }
+    var varIndex = this.tableau.getNewElementIndex();
+    if (id === null || id === undefined) {
+        id = "v" + varIndex;
+    }
 
-        this.variables.push(variable);
-        this.tableau.variablesPerIndex[varIndex] = variable;
+    if (cost === null || cost === undefined) {
+        cost = 0;
+    }
 
-        if (isUnrestricted) {
-            this.unrestrictedVariables[varIndex] = true;
-        }
+    if (priority === null || priority === undefined) {
+        priority = 0;
+    }
 
-        this.nVariables += 1;
+    var variable;
+    if (isInteger) {
+        variable = new IntegerVariable(id, cost, varIndex, priority);
+        this.integerVariables.push(variable);
+    } else {
+        variable = new Variable(id, cost, varIndex, priority);
+    }
 
-        if (this.tableauInitialized === true) {
-            this.tableau.addVariable(variable);
-        }
+    this.variables.push(variable);
+    this.tableau.variablesPerIndex[varIndex] = variable;
 
-        return variable;
-    };
+    if (isUnrestricted) {
+        this.unrestrictedVariables[varIndex] = true;
+    }
 
-    Model.prototype._removeConstraint = function (constraint) {
-        var idx = this.constraints.indexOf(constraint);
-        if (idx === -1) {
-            console.warn("[Model.removeConstraint] Constraint not present in model");
-            return;
-        }
+    this.nVariables += 1;
 
-        this.constraints.splice(idx, 1);
-        this.nConstraints -= 1;
+    if (this.tableauInitialized === true) {
+        this.tableau.addVariable(variable);
+    }
 
-        if (this.tableauInitialized === true) {
-            this.tableau.removeConstraint(constraint);
-        }
+    return variable;
+};
 
-        if (constraint.relaxation) {
-            this.removeVariable(constraint.relaxation);
-        }
-    };
+Model.prototype._removeConstraint = function (constraint) {
+    var idx = this.constraints.indexOf(constraint);
+    if (idx === -1) {
+        console.warn("[Model.removeConstraint] Constraint not present in model");
+        return;
+    }
 
-    //-------------------------------------------------------------------
-    // For dynamic model modification
-    //-------------------------------------------------------------------
-    Model.prototype.removeConstraint = function (constraint) {
-        if (constraint.isEquality) {
-            this._removeConstraint(constraint.upperBound);
-            this._removeConstraint(constraint.lowerBound);
-        } else {
-            this._removeConstraint(constraint);
-        }
+    this.constraints.splice(idx, 1);
+    this.nConstraints -= 1;
 
-        return this;
-    };
+    if (this.tableauInitialized === true) {
+        this.tableau.removeConstraint(constraint);
+    }
 
-    Model.prototype.removeVariable = function (variable) {
-        var idx = this.variables.indexOf(variable);
-        if (idx === -1) {
-            console.warn("[Model.removeVariable] Variable not present in model");
-            return;
-        }
-        this.variables.splice(idx, 1);
+    if (constraint.relaxation) {
+        this.removeVariable(constraint.relaxation);
+    }
+};
 
-        if (this.tableauInitialized === true) {
-            this.tableau.removeVariable(variable);
-        }
+//-------------------------------------------------------------------
+// For dynamic model modification
+//-------------------------------------------------------------------
+Model.prototype.removeConstraint = function (constraint) {
+    if (constraint.isEquality) {
+        this._removeConstraint(constraint.upperBound);
+        this._removeConstraint(constraint.lowerBound);
+    } else {
+        this._removeConstraint(constraint);
+    }
 
-        return this;
-    };
+    return this;
+};
 
-    Model.prototype.updateRightHandSide = function (constraint, difference) {
-        if (this.tableauInitialized === true) {
-            this.tableau.updateRightHandSide(constraint, difference);
-        }
-        return this;
-    };
+Model.prototype.removeVariable = function (variable) {
+    var idx = this.variables.indexOf(variable);
+    if (idx === -1) {
+        console.warn("[Model.removeVariable] Variable not present in model");
+        return;
+    }
+    this.variables.splice(idx, 1);
 
-    Model.prototype.updateConstraintCoefficient = function (constraint, variable, difference) {
-        if (this.tableauInitialized === true) {
-            this.tableau.updateConstraintCoefficient(constraint, variable, difference);
-        }
-        return this;
-    };
+    if (this.tableauInitialized === true) {
+        this.tableau.removeVariable(variable);
+    }
+
+    return this;
+};
+
+Model.prototype.updateRightHandSide = function (constraint, difference) {
+    if (this.tableauInitialized === true) {
+        this.tableau.updateRightHandSide(constraint, difference);
+    }
+    return this;
+};
+
+Model.prototype.updateConstraintCoefficient = function (constraint, variable, difference) {
+    if (this.tableauInitialized === true) {
+        this.tableau.updateConstraintCoefficient(constraint, variable, difference);
+    }
+    return this;
+};
 
 
-    Model.prototype.setCost = function (cost, variable) {
-        var difference = cost - variable.cost;
-        if (this.isMinimization === false) {
-            difference = -difference;
-        }
+Model.prototype.setCost = function (cost, variable) {
+    var difference = cost - variable.cost;
+    if (this.isMinimization === false) {
+        difference = -difference;
+    }
 
-        variable.cost = cost;
-        this.tableau.updateCost(variable, difference);
-        return this;
-    };
+    variable.cost = cost;
+    this.tableau.updateCost(variable, difference);
+    return this;
+};
 
-    //-------------------------------------------------------------------
-    //-------------------------------------------------------------------
-    Model.prototype.loadJson = function (jsonModel) {
-        this.isMinimization = (jsonModel.opType !== "max");
+//-------------------------------------------------------------------
+//-------------------------------------------------------------------
+Model.prototype.loadJson = function (jsonModel) {
+    this.isMinimization = (jsonModel.opType !== "max");
 
-        var variables = jsonModel.variables;
-        var constraints = jsonModel.constraints;
+    var variables = jsonModel.variables;
+    var constraints = jsonModel.constraints;
 
-        var constraintsMin = {};
-        var constraintsMax = {};
+    var constraintsMin = {};
+    var constraintsMax = {};
 
-        // Instantiating constraints
-        var constraintIds = Object.keys(constraints);
-        var nConstraintIds = constraintIds.length;
+    // Instantiating constraints
+    var constraintIds = Object.keys(constraints);
+    var nConstraintIds = constraintIds.length;
 
-        for (var c = 0; c < nConstraintIds; c += 1) {
-            var constraintId = constraintIds[c];
-            var constraint = constraints[constraintId];
-            var equal = constraint.equal;
+    for (var c = 0; c < nConstraintIds; c += 1) {
+        var constraintId = constraintIds[c];
+        var constraint = constraints[constraintId];
+        var equal = constraint.equal;
 
-            var weight = constraint.weight;
-            var priority = constraint.priority;
-            var relaxed = weight !== undefined || priority !== undefined;
+        var weight = constraint.weight;
+        var priority = constraint.priority;
+        var relaxed = weight !== undefined || priority !== undefined;
 
-            var lowerBound, upperBound;
-            if (equal === undefined) {
-                var min = constraint.min;
-                if (min !== undefined) {
-                    lowerBound = this.greaterThan(min);
-                    constraintsMin[constraintId] = lowerBound;
-                    if (relaxed) { lowerBound.relax(weight, priority); }
-                }
-
-                var max = constraint.max;
-                if (max !== undefined) {
-                    upperBound = this.smallerThan(max);
-                    constraintsMax[constraintId] = upperBound;
-                    if (relaxed) { upperBound.relax(weight, priority); }
-                }
-            } else {
-                lowerBound = this.greaterThan(equal);
+        var lowerBound, upperBound;
+        if (equal === undefined) {
+            var min = constraint.min;
+            if (min !== undefined) {
+                lowerBound = this.greaterThan(min);
                 constraintsMin[constraintId] = lowerBound;
+                if (relaxed) { lowerBound.relax(weight, priority); }
+            }
 
-                upperBound = this.smallerThan(equal);
+            var max = constraint.max;
+            if (max !== undefined) {
+                upperBound = this.smallerThan(max);
                 constraintsMax[constraintId] = upperBound;
-
-                var equality = new Equality(lowerBound, upperBound);
-                if (relaxed) { equality.relax(weight, priority); }
+                if (relaxed) { upperBound.relax(weight, priority); }
             }
+        } else {
+            lowerBound = this.greaterThan(equal);
+            constraintsMin[constraintId] = lowerBound;
+
+            upperBound = this.smallerThan(equal);
+            constraintsMax[constraintId] = upperBound;
+
+            var equality = new Equality(lowerBound, upperBound);
+            if (relaxed) { equality.relax(weight, priority); }
         }
-
-        var variableIds = Object.keys(variables);
-        var nVariables = variableIds.length;
-
-        var integerVarIds = jsonModel.ints || {};
-        var binaryVarIds = jsonModel.binaries || {};
-        var unrestrictedVarIds = jsonModel.unrestricted || {};
-
-        // Instantiating variables and constraint terms
-        var objectiveName = jsonModel.optimize;
-        for (var v = 0; v < nVariables; v += 1) {
-            // Creation of the variables
-            var variableId = variableIds[v];
-            var variableConstraints = variables[variableId];
-            var cost = variableConstraints[objectiveName] || 0;
-            var isBinary = !!binaryVarIds[variableId];
-            var isInteger = !!integerVarIds[variableId] || isBinary;
-            var isUnrestricted = !!unrestrictedVarIds[variableId];
-            var variable = this.addVariable(cost, variableId, isInteger, isUnrestricted);
-
-            if (isBinary) {
-                // Creating an upperbound constraint for this variable
-                this.smallerThan(1).addTerm(1, variable);
-            }
-
-            var constraintNames = Object.keys(variableConstraints);
-            for (c = 0; c < constraintNames.length; c += 1) {
-                var constraintName = constraintNames[c];
-                if (constraintName === objectiveName) {
-                    continue;
-                }
-
-                var coefficient = variableConstraints[constraintName];
-
-                var constraintMin = constraintsMin[constraintName];
-                if (constraintMin !== undefined) {
-                    constraintMin.addTerm(coefficient, variable);
-                }
-
-                var constraintMax = constraintsMax[constraintName];
-                if (constraintMax !== undefined) {
-                    constraintMax.addTerm(coefficient, variable);
-                }
-            }
-        }
-
-        return this;
-    };
-
-    //-------------------------------------------------------------------
-    //-------------------------------------------------------------------
-    Model.prototype.getNumberOfIntegerVariables = function () {
-        return this.integerVariables.length;
-    };
-
-    Model.prototype.solve = function () {
-        // Setting tableau if not done
-        if (this.tableauInitialized === false) {
-            this.tableau.setModel(this);
-            this.tableauInitialized = true;
-        }
-
-        return this.tableau.solve();
-    };
-
-    Model.prototype.isFeasible = function () {
-        return this.tableau.feasible;
-    };
-
-    Model.prototype.save = function () {
-        return this.tableau.save();
-    };
-
-    Model.prototype.restore = function () {
-        return this.tableau.restore();
-    };
-
-    Model.prototype.activateMIRCuts = function (useMIRCuts) {
-        this.useMIRCuts = useMIRCuts;
-    };
-
-    Model.prototype.debug = function (debugCheckForCycles) {
-        this.checkForCycles = debugCheckForCycles;
-    };
-
-    Model.prototype.log = function (message) {
-        return this.tableau.log(message);
-    };
-
-    /***************************************************************
-     * Method: polyopt
-     * Scope: private
-     * Agruments:
-     *        model: The model we want solver to operate on.
-                     Because we're in here, we're assuming that
-                     we're solving a multi-objective optimization
-                     problem. Poly-Optimization. polyopt.
-
-                     This model has to be formed a little differently
-                     because it has multiple objective functions.
-                     Normally, a model has 2 attributes: opType (string,
-                     "max" or "min"), and optimize (string, whatever
-                     attribute we're optimizing.
-
-                     Now, there is no opType attribute on the model,
-                     and optimize is an object of attributes to be
-                     optimized, and how they're to be optimized.
-                     For example:
-
-                     ...
-                     "optimize": {
-                        "pancakes": "max",
-                        "cost": "minimize"
-                     }
-                     ...
-
-
-     **************************************************************/
-
-    function foo() {
-
-        // I have no idea if this is actually works, or what,
-        // but here is my algorithm to solve linear programs
-        // with multiple objective functions
-
-        // 1. Optimize for each constraint
-        // 2. The results for each solution is a vector
-        //    representing a vertex on the polytope we're creating
-        // 3. The results for all solutions describes the shape
-        //    of the polytope (would be nice to have the equation
-        //    representing this)
-        // 4. Find the mid-point between all vertices by doing the
-        //    following (a_1 + a_2 ... a_n) / n;
-        var objectives = model.optimize,
-            new_constraints = JSON.parse(JSON.stringify(model.optimize)),
-            keys = Object.keys(model.optimize),
-            tmp,
-            counter = 0,
-            vectors = {},
-            vector_key = "",
-            obj = {},
-            pareto = [],
-            i,j,x,y,z;
-
-        // Delete the optimize object from the model
-        delete model.optimize;
-
-        // Iterate and Clear
-        for(i = 0; i < keys.length; i++){
-            // Clean up the new_constraints
-            new_constraints[keys[i]] = 0;
-        }
-
-        // Solve and add
-        for(i = 0; i < keys.length; i++){
-
-            // Prep the model
-            model.optimize = keys[i];
-            model.opType = objectives[keys[i]];
-
-            // solve the model
-            tmp = solver.Solve(model, undefined, undefined, true);
-
-            // Only the variables make it into the solution;
-            // not the attributes.
-            //
-            // Because of this, we have to add the attributes
-            // back onto the solution so we can do math with
-            // them later...
-
-            // Loop over the keys
-            for(y in keys){
-                // We're only worried about attributes, not variables
-                if(!model.variables[keys[y]]){
-                    // Create space for the attribute in the tmp object
-                    tmp[keys[y]] = tmp[keys[y]] ? tmp[keys[y]] : 0;
-                    // Go over each of the variables
-                    for(x in model.variables){
-                        // Does the variable exist in tmp *and* does attribute exist in this model?
-                        if(model.variables[x][keys[y]] && tmp[x]){
-                            // Add it to tmp
-                            tmp[keys[y]] += tmp[x] * model.variables[x][keys[y]];
-                        }
-                    }
-                }
-            }
-
-            // clear our key
-            vector_key = "base";
-            // this makes sure that if we get
-            // the same vector more than once,
-            // we only count it once when finding
-            // the midpoint
-            for(j = 0; j < keys.length; j++){
-                if(tmp[keys[j]]){
-                    vector_key += "-" + ((tmp[keys[j]] * 1000) | 0) / 1000;
-                } else {
-                    vector_key += "-0";
-                }
-            }
-
-            // Check here to ensure it doesn't exist
-            if(!vectors[vector_key]){
-                // Add the vector-key in
-                vectors[vector_key] = 1;
-                counter++;
-                
-                // Iterate over the keys
-                // and update our new constraints
-                for(j = 0; j < keys.length; j++){
-                    if(tmp[keys[j]]){
-                        new_constraints[keys[j]] += tmp[keys[j]];
-                    }
-                }
-                
-                // Push the solution into the paretos
-                // array after cleaning it of some
-                // excess data markers
-                
-                delete tmp.feasible;
-                delete tmp.result;            
-                pareto.push(tmp);
-            }
-        }
-
-        // Trying to find the mid-point
-        // divide each constraint by the
-        // number of constraints
-        // *midpoint formula*
-        // (x1 + x2 + x3) / 3
-        for(i = 0; i < keys.length; i++){
-            model.constraints[keys[i]] = {"equal": new_constraints[keys[i]] / counter};
-        }
-
-        // Give the model a fake thing to optimize on
-        model.optimize = "cheater-" + Math.random();
-        model.opType = "max";
-
-        // And add the fake attribute to the variables
-        // in the model
-        for(i in model.variables){
-            model.variables[i].cheater = 1;
-        }
-        
-        // Build out the object with all attributes
-        for(i in pareto){
-            for(x in pareto[i]){
-                obj[x] = obj[x] || {min: 1e99, max: -1e99};
-            }
-        }
-        
-        // Give each pareto a full attribute list
-        // while getting the max and min values
-        // for each attribute
-        for(i in obj){
-            for(x in pareto){
-                if(pareto[x][i]){
-                    if(pareto[x][i] > obj[i].max){
-                        obj[i].max = pareto[x][i];
-                    } 
-                    if(pareto[x][i] < obj[i].min){
-                        obj[i].min = pareto[x][i];
-                    }
-                } else {
-                    pareto[x][i] = 0;
-                    obj[i].min = 0;
-                }
-            }
-        }
-        // Solve the model for the midpoints
-        tmp =  solver.Solve(model, undefined, undefined, true);
-        
-        return {
-            midpoint: tmp,
-            vertices: pareto,
-            ranges: obj
-        };    
-
-    };
-
-
-
-
-
-
-    /*************************************************************
-    * Method: to_JSON
-    * Scope: Public:
-    * Agruments: input: Whatever the user gives us
-    * Purpose: Convert an unfriendly formatted LP
-    *          into something that our library can
-    *          work with
-    **************************************************************/
-    function to_JSON(input){
-        var rxo = {
-            /* jshint ignore:start */
-            "is_blank": /^\W{0,}$/,
-            "is_objective": /(max|min)(imize){0,}\:/i,
-            //previous version
-            //"is_int": /^\W{0,}int/i,
-            //new version to avoid comments
-            "is_int": /^(?!\/\*)\W{0,}int/i,
-            "is_constraint": /(\>|\<){0,}\=/i,
-            "is_unrestricted": /^\S{0,}unrestricted/i,
-            "parse_lhs":  /(\-|\+){0,1}\s{0,1}\d{0,}\.{0,}\d{0,}\s{0,}[A-Za-z]\S{0,}/gi,
-            "parse_rhs": /(\-|\+){0,1}\d{1,}\.{0,}\d{0,}\W{0,}\;{0,1}$/i,
-            "parse_dir": /(\>|\<){0,}\=/gi,
-            "parse_int": /[^\s|^\,]+/gi,
-            "get_num": /(\-|\+){0,1}(\W|^)\d+\.{0,1}\d{0,}/g, // Why accepting character \W before the first digit?
-            "get_word": /[A-Za-z].*/
-            /* jshint ignore:end */
-        },
-        model = {
-            "opType": "",
-            "optimize": "_obj",
-            "constraints": {},
-            "variables": {}
-        },
-        constraints = {
-            ">=": "min",
-            "<=": "max",
-            "=": "equal"
-        },
-        tmp = "", tst = 0, ary = null, hldr = "", hldr2 = "",
-        constraint = "", rhs = 0;
-
-        // Handle input if its coming
-        // to us as a hard string
-        // instead of as an array of
-        // strings
-        if(typeof input === "string"){
-            input = input.split("\n");
-        }
-
-        // Start iterating over the rows
-        // to see what all we have
-        for(var i = 0; i < input.length; i++){
-
-            constraint = "__" + i;
-
-            // Get the string we're working with
-            tmp = input[i];
-
-            // Set the test = 0
-            tst = 0;
-
-            // Reset the array
-            ary = null;
-
-            // Test to see if we're the objective
-            if(rxo.is_objective.test(tmp)){
-                // Set up in model the opType
-                model.opType = tmp.match(/(max|min)/gi)[0];
-
-                // Pull apart lhs
-                ary = tmp.match(rxo.parse_lhs).map(function(d){
-                    return d.replace(/\s+/,"");
-                }).slice(1);
-
-
-
-                // *** STEP 1 *** ///
-                // Get the variables out
-                ary.forEach(function(d){
-
-                    // Get the number if its there
-                    hldr = d.match(rxo.get_num);
-
-                    // If it isn't a number, it might
-                    // be a standalone variable
-                    if(hldr === null){
-                        if(d.substr(0,1) === "-"){
-                            hldr = -1;
-                        } else {
-                            hldr = 1;
-                        }
-                    } else {
-                        hldr = hldr[0];
-                    }
-
-                    hldr = parseFloat(hldr);
-
-                    // Get the variable type
-                    hldr2 = d.match(rxo.get_word)[0].replace(/\;$/,"");
-
-                    // Make sure the variable is in the model
-                    model.variables[hldr2] = model.variables[hldr2] || {};
-                    model.variables[hldr2]._obj = hldr;
-
-                });
-            ////////////////////////////////////
-            }else if(rxo.is_int.test(tmp)){
-                // Get the array of ints
-                ary = tmp.match(rxo.parse_int).slice(1);
-
-                // Since we have an int, our model should too
-                model.ints = model.ints || {};
-
-                ary.forEach(function(d){
-                    d = d.replace(";","");
-                    model.ints[d] = 1;
-                });
-            ////////////////////////////////////
-            } else if(rxo.is_constraint.test(tmp)){
-                var separatorIndex = tmp.indexOf(":");
-                var constraintExpression = (separatorIndex === -1) ? tmp : tmp.slice(separatorIndex + 1);
-
-                // Pull apart lhs
-                ary = constraintExpression.match(rxo.parse_lhs).map(function(d){
-                    return d.replace(/\s+/,"");
-                });
-
-                // *** STEP 1 *** ///
-                // Get the variables out
-                ary.forEach(function(d){
-                    // Get the number if its there
-                    hldr = d.match(rxo.get_num);
-
-                    if(hldr === null){
-                        if(d.substr(0,1) === "-"){
-                            hldr = -1;
-                        } else {
-                            hldr = 1;
-                        }
-                    } else {
-                        hldr = hldr[0];
-                    }
-
-                    hldr = parseFloat(hldr);
-
-
-                    // Get the variable name
-                    hldr2 = d.match(rxo.get_word)[0];
-
-                    // Make sure the variable is in the model
-                    model.variables[hldr2] = model.variables[hldr2] || {};
-                    model.variables[hldr2][constraint] = hldr;
-
-                });
-
-                // *** STEP 2 *** ///
-                // Get the RHS out
-                rhs = parseFloat(tmp.match(rxo.parse_rhs)[0]);
-
-                // *** STEP 3 *** ///
-                // Get the Constrainer out
-                tmp = constraints[tmp.match(rxo.parse_dir)[0]];
-                model.constraints[constraint] = model.constraints[constraint] || {};
-                model.constraints[constraint][tmp] = rhs;
-            ////////////////////////////////////
-            } else if(rxo.is_unrestricted.test(tmp)){
-                // Get the array of unrestricted
-                ary = tmp.match(rxo.parse_int).slice(1);
-
-                // Since we have an int, our model should too
-                model.unrestricted = model.unrestricted || {};
-
-                ary.forEach(function(d){
-                    d = d.replace(";","");
-                    model.unrestricted[d] = 1;
-                });
-            }
-        }
-        return model;
     }
 
+    var variableIds = Object.keys(variables);
+    var nVariables = variableIds.length;
 
-    /*************************************************************
-    * Method: from_JSON
-    * Scope: Public:
-    * Agruments: model: The model we want solver to operate on
-    * Purpose: Convert a friendly JSON model into a model for a
-    *          real solving library...in this case
-    *          lp_solver
-    **************************************************************/
-    function from_JSON(model){
-        // Make sure we at least have a model
-        if (!model) {
-            throw new Error("Solver requires a model to operate on");
+    var integerVarIds = jsonModel.ints || {};
+    var binaryVarIds = jsonModel.binaries || {};
+    var unrestrictedVarIds = jsonModel.unrestricted || {};
+
+    // Instantiating variables and constraint terms
+    var objectiveName = jsonModel.optimize;
+    for (var v = 0; v < nVariables; v += 1) {
+        // Creation of the variables
+        var variableId = variableIds[v];
+        var variableConstraints = variables[variableId];
+        var cost = variableConstraints[objectiveName] || 0;
+        var isBinary = !!binaryVarIds[variableId];
+        var isInteger = !!integerVarIds[variableId] || isBinary;
+        var isUnrestricted = !!unrestrictedVarIds[variableId];
+        var variable = this.addVariable(cost, variableId, isInteger, isUnrestricted);
+
+        if (isBinary) {
+            // Creating an upperbound constraint for this variable
+            this.smallerThan(1).addTerm(1, variable);
         }
 
-        var output = "",
-            ary = [],
-            norm = 1,
-            lookup = {
-                "max": "<=",
-                "min": ">=",
-                "equal": "="
-            },
-            rxClean = new RegExp("[^A-Za-z0-9]+", "gi");
-
-        // Build the objective statement
-        output += model.opType + ":";
-
-        // Iterate over the variables
-        for(var x in model.variables){
-            // Give each variable a self of 1 unless
-            // it exists already
-            model.variables[x][x] = model.variables[x][x] ? model.variables[x][x] : 1;
-
-            // Does our objective exist here?
-            if(model.variables[x][model.optimize]){
-                output += " " + model.variables[x][model.optimize] + " " + x.replace(rxClean,"_");
-            }
-        }
-
-        // Add some closure to our line thing
-        output += ";\n";
-
-        // And now... to iterate over the constraints
-        for(x in model.constraints){
-            for(var y in model.constraints[x]){
-                for(var z in model.variables){
-                    // Does our Constraint exist here?
-                    if(model.variables[z][x]){
-                        output += " " + model.variables[z][x] + " " + z.replace(rxClean,"_");
-                    }
-                }
-                // Add the constraint type and value...
-                output += " " + lookup[y] + " " + model.constraints[x][y];
-                output += ";\n";
-            }
-        }
-
-        // Are there any ints?
-        if(model.ints){
-            output += "\n\n";
-            for(x in model.ints){
-                output += "int " + x.replace(rxClean,"_") + ";\n";
-            }
-        }
-
-        // Are there any unrestricted?
-        if(model.unrestricted){
-            output += "\n\n";
-            for(x in model.unrestricted){
-                output += "unrestricted " + x.replace(rxClean,"_") + ";\n";
-            }
-        }
-
-        // And kick the string back
-        return output;
-    }
-
-
-        // If the user is giving us an array
-        // or a string, convert it to a JSON Model
-        // otherwise, spit it out as a string
-        // if(model.length){
-        //     return to_JSON(model);
-        // } else {
-        //     return from_JSON(model);
-        // }
-
-    var Solution = require("./Solution.js");
-
-    function MilpSolution(tableau, evaluation, feasible, bounded, branchAndCutIterations) {
-        Solution.call(this, tableau, evaluation, feasible, bounded);
-        this.iter = branchAndCutIterations;
-    }
-    MilpSolution.prototype = Object.create(Solution.prototype);
-    MilpSolution.constructor = MilpSolution;
-
-    /*global module*/
-
-    function Solution(tableau, evaluation, feasible, bounded) {
-        this.feasible = feasible;
-        this.evaluation = evaluation;
-        this.bounded = bounded;
-        this._tableau = tableau;
-    }
-
-    Solution.prototype.generateSolutionSet = function () {
-        var solutionSet = {};
-
-        var tableau = this._tableau;
-        var varIndexByRow = tableau.varIndexByRow;
-        var variablesPerIndex = tableau.variablesPerIndex;
-        var matrix = tableau.matrix;
-        var rhsColumn = tableau.rhsColumn;
-        var lastRow = tableau.height - 1;
-        var roundingCoeff = Math.round(1 / tableau.precision);
-
-        for (var r = 1; r <= lastRow; r += 1) {
-            var varIndex = varIndexByRow[r];
-            var variable = variablesPerIndex[varIndex];
-            if (variable === undefined || variable.isSlack === true) {
+        var constraintNames = Object.keys(variableConstraints);
+        for (c = 0; c < constraintNames.length; c += 1) {
+            var constraintName = constraintNames[c];
+            if (constraintName === objectiveName) {
                 continue;
             }
 
-            var varValue = matrix[r][rhsColumn];
-            solutionSet[variable.id] =
-                Math.round(varValue * roundingCoeff) / roundingCoeff;
-        }
+            var coefficient = variableConstraints[constraintName];
 
-        return solutionSet;
-    };
-    /*global describe*/
-    /*global require*/
-    /*global module*/
-    /*global it*/
-    /*global console*/
-    /*global process*/
-    var Solution = require("./Solution.js");
-    var MilpSolution = require("./MilpSolution.js");
+            var constraintMin = constraintsMin[constraintName];
+            if (constraintMin !== undefined) {
+                constraintMin.addTerm(coefficient, variable);
+            }
 
-    /*************************************************************
-     * Class: Tableau
-     * Description: Simplex tableau, holding a the tableau matrix
-     *              and all the information necessary to perform
-     *              the simplex algorithm
-     * Agruments:
-     *        precision: If we're solving a MILP, how tight
-     *                   do we want to define an integer, given
-     *                   that 20.000000000000001 is not an integer.
-     *                   (defaults to 1e-8)
-     **************************************************************/
-    function Tableau(precision) {
-        this.model = null;
-
-        this.matrix = null;
-        this.width = 0;
-        this.height = 0;
-
-        this.costRowIndex = 0;
-        this.rhsColumn = 0;
-
-        this.variablesPerIndex = [];
-        this.unrestrictedVars = null;
-
-        // Solution attributes
-        this.feasible = true; // until proven guilty
-        this.evaluation = 0;
-
-        this.varIndexByRow = null;
-        this.varIndexByCol = null;
-
-        this.rowByVarIndex = null;
-        this.colByVarIndex = null;
-
-        this.precision = precision || 1e-8;
-
-        this.optionalObjectives = [];
-        this.objectivesByPriority = {};
-
-        this.savedState = null;
-
-        this.availableIndexes = [];
-        this.lastElementIndex = 0;
-
-        this.variables = null;
-        this.nVars = 0;
-
-        this.bounded = true;
-        this.unboundedVarIndex = null;
-
-        this.branchAndCutIterations = 0;
-    }
-
-    Tableau.prototype.solve = function () {
-        if (this.model.getNumberOfIntegerVariables() > 0) {
-            this.branchAndCut();
-        } else {
-            this.simplex();
-        }
-        this.updateVariableValues();
-        return this.getSolution();
-    };
-
-    function OptionalObjective(priority, nColumns) {
-        this.priority = priority;
-        this.reducedCosts = new Array(nColumns);
-        for (var c = 0; c < nColumns; c += 1) {
-            this.reducedCosts[c] = 0;
+            var constraintMax = constraintsMax[constraintName];
+            if (constraintMax !== undefined) {
+                constraintMax.addTerm(coefficient, variable);
+            }
         }
     }
 
-    OptionalObjective.prototype.copy = function () {
-        var copy = new OptionalObjective(this.priority, this.reducedCosts.length);
-        copy.reducedCosts = this.reducedCosts.slice();
-        return copy;
-    };
+    return this;
+};
 
-    Tableau.prototype.setOptionalObjective = function (priority, column, cost) {
-        var objectiveForPriority = this.objectivesByPriority[priority];
-        if (objectiveForPriority === undefined) {
-            var nColumns = Math.max(this.width, column + 1);
-            objectiveForPriority = new OptionalObjective(priority, nColumns);
-            this.objectivesByPriority[priority] = objectiveForPriority;
-            this.optionalObjectives.push(objectiveForPriority);
-            this.optionalObjectives.sort(function (a, b) {
-                return a.priority - b.priority;
+//-------------------------------------------------------------------
+//-------------------------------------------------------------------
+Model.prototype.getNumberOfIntegerVariables = function () {
+    return this.integerVariables.length;
+};
+
+Model.prototype.solve = function () {
+    // Setting tableau if not done
+    if (this.tableauInitialized === false) {
+        this.tableau.setModel(this);
+        this.tableauInitialized = true;
+    }
+
+    return this.tableau.solve();
+};
+
+Model.prototype.isFeasible = function () {
+    return this.tableau.feasible;
+};
+
+Model.prototype.save = function () {
+    return this.tableau.save();
+};
+
+Model.prototype.restore = function () {
+    return this.tableau.restore();
+};
+
+Model.prototype.activateMIRCuts = function (useMIRCuts) {
+    this.useMIRCuts = useMIRCuts;
+};
+
+Model.prototype.debug = function (debugCheckForCycles) {
+    this.checkForCycles = debugCheckForCycles;
+};
+
+Model.prototype.log = function (message) {
+    return this.tableau.log(message);
+};
+
+/***************************************************************
+ * Method: polyopt
+ * Scope: private
+ * Agruments:
+ *        model: The model we want solver to operate on.
+                 Because we're in here, we're assuming that
+                 we're solving a multi-objective optimization
+                 problem. Poly-Optimization. polyopt.
+
+                 This model has to be formed a little differently
+                 because it has multiple objective functions.
+                 Normally, a model has 2 attributes: opType (string,
+                 "max" or "min"), and optimize (string, whatever
+                 attribute we're optimizing.
+
+                 Now, there is no opType attribute on the model,
+                 and optimize is an object of attributes to be
+                 optimized, and how they're to be optimized.
+                 For example:
+
+                 ...
+                 "optimize": {
+                    "pancakes": "max",
+                    "cost": "minimize"
+                 }
+                 ...
+
+
+ **************************************************************/
+
+function foo() {
+
+    // I have no idea if this is actually works, or what,
+    // but here is my algorithm to solve linear programs
+    // with multiple objective functions
+
+    // 1. Optimize for each constraint
+    // 2. The results for each solution is a vector
+    //    representing a vertex on the polytope we're creating
+    // 3. The results for all solutions describes the shape
+    //    of the polytope (would be nice to have the equation
+    //    representing this)
+    // 4. Find the mid-point between all vertices by doing the
+    //    following (a_1 + a_2 ... a_n) / n;
+    var objectives = model.optimize,
+        new_constraints = JSON.parse(JSON.stringify(model.optimize)),
+        keys = Object.keys(model.optimize),
+        tmp,
+        counter = 0,
+        vectors = {},
+        vector_key = "",
+        obj = {},
+        pareto = [],
+        i,j,x,y,z;
+
+    // Delete the optimize object from the model
+    delete model.optimize;
+
+    // Iterate and Clear
+    for(i = 0; i < keys.length; i++){
+        // Clean up the new_constraints
+        new_constraints[keys[i]] = 0;
+    }
+
+    // Solve and add
+    for(i = 0; i < keys.length; i++){
+
+        // Prep the model
+        model.optimize = keys[i];
+        model.opType = objectives[keys[i]];
+
+        // solve the model
+        tmp = solver.Solve(model, undefined, undefined, true);
+
+        // Only the variables make it into the solution;
+        // not the attributes.
+        //
+        // Because of this, we have to add the attributes
+        // back onto the solution so we can do math with
+        // them later...
+
+        // Loop over the keys
+        for(y in keys){
+            // We're only worried about attributes, not variables
+            if(!model.variables[keys[y]]){
+                // Create space for the attribute in the tmp object
+                tmp[keys[y]] = tmp[keys[y]] ? tmp[keys[y]] : 0;
+                // Go over each of the variables
+                for(x in model.variables){
+                    // Does the variable exist in tmp *and* does attribute exist in this model?
+                    if(model.variables[x][keys[y]] && tmp[x]){
+                        // Add it to tmp
+                        tmp[keys[y]] += tmp[x] * model.variables[x][keys[y]];
+                    }
+                }
+            }
+        }
+
+        // clear our key
+        vector_key = "base";
+        // this makes sure that if we get
+        // the same vector more than once,
+        // we only count it once when finding
+        // the midpoint
+        for(j = 0; j < keys.length; j++){
+            if(tmp[keys[j]]){
+                vector_key += "-" + ((tmp[keys[j]] * 1000) | 0) / 1000;
+            } else {
+                vector_key += "-0";
+            }
+        }
+
+        // Check here to ensure it doesn't exist
+        if(!vectors[vector_key]){
+            // Add the vector-key in
+            vectors[vector_key] = 1;
+            counter++;
+            
+            // Iterate over the keys
+            // and update our new constraints
+            for(j = 0; j < keys.length; j++){
+                if(tmp[keys[j]]){
+                    new_constraints[keys[j]] += tmp[keys[j]];
+                }
+            }
+            
+            // Push the solution into the paretos
+            // array after cleaning it of some
+            // excess data markers
+            
+            delete tmp.feasible;
+            delete tmp.result;            
+            pareto.push(tmp);
+        }
+    }
+
+    // Trying to find the mid-point
+    // divide each constraint by the
+    // number of constraints
+    // *midpoint formula*
+    // (x1 + x2 + x3) / 3
+    for(i = 0; i < keys.length; i++){
+        model.constraints[keys[i]] = {"equal": new_constraints[keys[i]] / counter};
+    }
+
+    // Give the model a fake thing to optimize on
+    model.optimize = "cheater-" + Math.random();
+    model.opType = "max";
+
+    // And add the fake attribute to the variables
+    // in the model
+    for(i in model.variables){
+        model.variables[i].cheater = 1;
+    }
+    
+    // Build out the object with all attributes
+    for(i in pareto){
+        for(x in pareto[i]){
+            obj[x] = obj[x] || {min: 1e99, max: -1e99};
+        }
+    }
+    
+    // Give each pareto a full attribute list
+    // while getting the max and min values
+    // for each attribute
+    for(i in obj){
+        for(x in pareto){
+            if(pareto[x][i]){
+                if(pareto[x][i] > obj[i].max){
+                    obj[i].max = pareto[x][i];
+                } 
+                if(pareto[x][i] < obj[i].min){
+                    obj[i].min = pareto[x][i];
+                }
+            } else {
+                pareto[x][i] = 0;
+                obj[i].min = 0;
+            }
+        }
+    }
+    // Solve the model for the midpoints
+    tmp =  solver.Solve(model, undefined, undefined, true);
+    
+    return {
+        midpoint: tmp,
+        vertices: pareto,
+        ranges: obj
+    };    
+
+}
+
+
+
+
+
+
+/*************************************************************
+* Method: to_JSON
+* Scope: Public:
+* Agruments: input: Whatever the user gives us
+* Purpose: Convert an unfriendly formatted LP
+*          into something that our library can
+*          work with
+**************************************************************/
+function to_JSON(input){
+    var rxo = {
+        /* jshint ignore:start */
+        "is_blank": /^\W{0,}$/,
+        "is_objective": /(max|min)(imize){0,}\:/i,
+        //previous version
+        //"is_int": /^\W{0,}int/i,
+        //new version to avoid comments
+        "is_int": /^(?!\/\*)\W{0,}int/i,
+        "is_constraint": /(\>|\<){0,}\=/i,
+        "is_unrestricted": /^\S{0,}unrestricted/i,
+        "parse_lhs":  /(\-|\+){0,1}\s{0,1}\d{0,}\.{0,}\d{0,}\s{0,}[A-Za-z]\S{0,}/gi,
+        "parse_rhs": /(\-|\+){0,1}\d{1,}\.{0,}\d{0,}\W{0,}\;{0,1}$/i,
+        "parse_dir": /(\>|\<){0,}\=/gi,
+        "parse_int": /[^\s|^\,]+/gi,
+        "get_num": /(\-|\+){0,1}(\W|^)\d+\.{0,1}\d{0,}/g, // Why accepting character \W before the first digit?
+        "get_word": /[A-Za-z].*/
+        /* jshint ignore:end */
+    },
+    model = {
+        "opType": "",
+        "optimize": "_obj",
+        "constraints": {},
+        "variables": {}
+    },
+    constraints = {
+        ">=": "min",
+        "<=": "max",
+        "=": "equal"
+    },
+    tmp = "", tst = 0, ary = null, hldr = "", hldr2 = "",
+    constraint = "", rhs = 0;
+
+    // Handle input if its coming
+    // to us as a hard string
+    // instead of as an array of
+    // strings
+    if(typeof input === "string"){
+        input = input.split("\n");
+    }
+
+    // Start iterating over the rows
+    // to see what all we have
+    for(var i = 0; i < input.length; i++){
+
+        constraint = "__" + i;
+
+        // Get the string we're working with
+        tmp = input[i];
+
+        // Set the test = 0
+        tst = 0;
+
+        // Reset the array
+        ary = null;
+
+        // Test to see if we're the objective
+        if(rxo.is_objective.test(tmp)){
+            // Set up in model the opType
+            model.opType = tmp.match(/(max|min)/gi)[0];
+
+            // Pull apart lhs
+            ary = tmp.match(rxo.parse_lhs).map(function(d){
+                return d.replace(/\s+/,"");
+            }).slice(1);
+
+
+
+            // *** STEP 1 *** ///
+            // Get the variables out
+            ary.forEach(function(d){
+
+                // Get the number if its there
+                hldr = d.match(rxo.get_num);
+
+                // If it isn't a number, it might
+                // be a standalone variable
+                if(hldr === null){
+                    if(d.substr(0,1) === "-"){
+                        hldr = -1;
+                    } else {
+                        hldr = 1;
+                    }
+                } else {
+                    hldr = hldr[0];
+                }
+
+                hldr = parseFloat(hldr);
+
+                // Get the variable type
+                hldr2 = d.match(rxo.get_word)[0].replace(/\;$/,"");
+
+                // Make sure the variable is in the model
+                model.variables[hldr2] = model.variables[hldr2] || {};
+                model.variables[hldr2]._obj = hldr;
+
+            });
+        ////////////////////////////////////
+        }else if(rxo.is_int.test(tmp)){
+            // Get the array of ints
+            ary = tmp.match(rxo.parse_int).slice(1);
+
+            // Since we have an int, our model should too
+            model.ints = model.ints || {};
+
+            ary.forEach(function(d){
+                d = d.replace(";","");
+                model.ints[d] = 1;
+            });
+        ////////////////////////////////////
+        } else if(rxo.is_constraint.test(tmp)){
+            var separatorIndex = tmp.indexOf(":");
+            var constraintExpression = (separatorIndex === -1) ? tmp : tmp.slice(separatorIndex + 1);
+
+            // Pull apart lhs
+            ary = constraintExpression.match(rxo.parse_lhs).map(function(d){
+                return d.replace(/\s+/,"");
+            });
+
+            // *** STEP 1 *** ///
+            // Get the variables out
+            ary.forEach(function(d){
+                // Get the number if its there
+                hldr = d.match(rxo.get_num);
+
+                if(hldr === null){
+                    if(d.substr(0,1) === "-"){
+                        hldr = -1;
+                    } else {
+                        hldr = 1;
+                    }
+                } else {
+                    hldr = hldr[0];
+                }
+
+                hldr = parseFloat(hldr);
+
+
+                // Get the variable name
+                hldr2 = d.match(rxo.get_word)[0];
+
+                // Make sure the variable is in the model
+                model.variables[hldr2] = model.variables[hldr2] || {};
+                model.variables[hldr2][constraint] = hldr;
+
+            });
+
+            // *** STEP 2 *** ///
+            // Get the RHS out
+            rhs = parseFloat(tmp.match(rxo.parse_rhs)[0]);
+
+            // *** STEP 3 *** ///
+            // Get the Constrainer out
+            tmp = constraints[tmp.match(rxo.parse_dir)[0]];
+            model.constraints[constraint] = model.constraints[constraint] || {};
+            model.constraints[constraint][tmp] = rhs;
+        ////////////////////////////////////
+        } else if(rxo.is_unrestricted.test(tmp)){
+            // Get the array of unrestricted
+            ary = tmp.match(rxo.parse_int).slice(1);
+
+            // Since we have an int, our model should too
+            model.unrestricted = model.unrestricted || {};
+
+            ary.forEach(function(d){
+                d = d.replace(";","");
+                model.unrestricted[d] = 1;
             });
         }
+    }
+    return model;
+}
 
-        objectiveForPriority.reducedCosts[column] = cost;
-    };
 
-    //-------------------------------------------------------------------
-    //-------------------------------------------------------------------
-    Tableau.prototype.initialize = function (width, height, variables, unrestrictedVars) {
-        this.variables = variables;
-        this.unrestrictedVars = unrestrictedVars;
+/*************************************************************
+* Method: from_JSON
+* Scope: Public:
+* Agruments: model: The model we want solver to operate on
+* Purpose: Convert a friendly JSON model into a model for a
+*          real solving library...in this case
+*          lp_solver
+**************************************************************/
+function from_JSON(model){
+    // Make sure we at least have a model
+    if (!model) {
+        throw new Error("Solver requires a model to operate on");
+    }
 
-        this.width = width;
-        this.height = height;
+    var output = "",
+        ary = [],
+        norm = 1,
+        lookup = {
+            "max": "<=",
+            "min": ">=",
+            "equal": "="
+        },
+        rxClean = new RegExp("[^A-Za-z0-9]+", "gi");
 
-        // BUILD AN EMPTY ARRAY OF THAT WIDTH
-        var tmpRow = new Array(width);
-        for (var i = 0; i < width; i++) {
-            tmpRow[i] = 0;
+    // Build the objective statement
+    output += model.opType + ":";
+
+    // Iterate over the variables
+    for(var x in model.variables){
+        // Give each variable a self of 1 unless
+        // it exists already
+        model.variables[x][x] = model.variables[x][x] ? model.variables[x][x] : 1;
+
+        // Does our objective exist here?
+        if(model.variables[x][model.optimize]){
+            output += " " + model.variables[x][model.optimize] + " " + x.replace(rxClean,"_");
         }
+    }
 
-        // BUILD AN EMPTY TABLEAU
-        this.matrix = new Array(height);
-        for (var j = 0; j < height; j++) {
-            this.matrix[j] = tmpRow.slice();
-        }
+    // Add some closure to our line thing
+    output += ";\n";
 
-        this.varIndexByRow = new Array(this.height);
-        this.varIndexByCol = new Array(this.width);
-
-        this.varIndexByRow[0] = -1;
-        this.varIndexByCol[0] = -1;
-
-        this.nVars = width + height - 2;
-        this.rowByVarIndex = new Array(this.nVars);
-        this.colByVarIndex = new Array(this.nVars);
-
-        this.lastElementIndex = this.nVars;
-    };
-
-    Tableau.prototype._resetMatrix = function () {
-        var variables = this.model.variables;
-        var constraints = this.model.constraints;
-
-        var nVars = variables.length;
-        var nConstraints = constraints.length;
-
-        var v, varIndex;
-        var costRow = this.matrix[0];
-        var coeff = (this.model.isMinimization === true) ? -1 : 1;
-        for (v = 0; v < nVars; v += 1) {
-            var variable = variables[v];
-            var priority = variable.priority;
-            var cost = coeff * variable.cost;
-            if (priority === 0) {
-                costRow[v + 1] = cost;
-            } else {
-                this.setOptionalObjective(priority, v + 1, cost);
-            }
-
-            varIndex = variables[v].index;
-            this.rowByVarIndex[varIndex] = -1;
-            this.colByVarIndex[varIndex] = v + 1;
-            this.varIndexByCol[v + 1] = varIndex;
-        }
-
-        var rowIndex = 1;
-        for (var c = 0; c < nConstraints; c += 1) {
-            var constraint = constraints[c];
-
-            var constraintIndex = constraint.index;
-            this.rowByVarIndex[constraintIndex] = rowIndex;
-            this.colByVarIndex[constraintIndex] = -1;
-            this.varIndexByRow[rowIndex] = constraintIndex;
-
-            var t, term, column;
-            var terms = constraint.terms;
-            var nTerms = terms.length;
-            var row = this.matrix[rowIndex++];
-            if (constraint.isUpperBound) {
-                for (t = 0; t < nTerms; t += 1) {
-                    term = terms[t];
-                    column = this.colByVarIndex[term.variable.index];
-                    row[column] = term.coefficient;
-                }
-
-                row[0] = constraint.rhs;
-            } else {
-                for (t = 0; t < nTerms; t += 1) {
-                    term = terms[t];
-                    column = this.colByVarIndex[term.variable.index];
-                    row[column] = -term.coefficient;
-                }
-
-                row[0] = -constraint.rhs;
-            }
-        }
-    };
-
-    //-------------------------------------------------------------------
-    //-------------------------------------------------------------------
-    Tableau.prototype.setModel = function (model) {
-        this.model = model;
-
-        var width = model.nVariables + 1;
-        var height = model.nConstraints + 1;
-
-
-        this.initialize(width, height, model.variables, model.unrestrictedVariables);
-        this._resetMatrix();
-        return this;
-    };
-
-    Tableau.prototype.getNewElementIndex = function () {
-        if (this.availableIndexes.length > 0) {
-            return this.availableIndexes.pop();
-        }
-
-        var index = this.lastElementIndex;
-        this.lastElementIndex += 1;
-        return index;
-    };
-
-    Tableau.prototype.density = function () {
-        var density = 0;
-
-        var matrix = this.matrix;
-        for (var r = 0; r < this.height; r++) {
-            var row = matrix[r];
-            for (var c = 0; c < this.width; c++) {
-                if (row[c] !== 0) {
-                    density += 1;
+    // And now... to iterate over the constraints
+    for(x in model.constraints){
+        for(var y in model.constraints[x]){
+            for(var z in model.variables){
+                // Does our Constraint exist here?
+                if(model.variables[z][x]){
+                    output += " " + model.variables[z][x] + " " + z.replace(rxClean,"_");
                 }
             }
+            // Add the constraint type and value...
+            output += " " + lookup[y] + " " + model.constraints[x][y];
+            output += ";\n";
+        }
+    }
+
+    // Are there any ints?
+    if(model.ints){
+        output += "\n\n";
+        for(x in model.ints){
+            output += "int " + x.replace(rxClean,"_") + ";\n";
+        }
+    }
+
+    // Are there any unrestricted?
+    if(model.unrestricted){
+        output += "\n\n";
+        for(x in model.unrestricted){
+            output += "unrestricted " + x.replace(rxClean,"_") + ";\n";
+        }
+    }
+
+    // And kick the string back
+    return output;
+}
+
+
+// If the user is giving us an array
+// or a string, convert it to a JSON Model
+// otherwise, spit it out as a string
+// if(model.length){
+//     return to_JSON(model);
+// } else {
+//     return from_JSON(model);
+// }
+
+import TableauSolution from './Tableau/Solution';
+
+function MilpSolution(tableau, evaluation, feasible, bounded, branchAndCutIterations) {
+    TableauSolution.call(this, tableau, evaluation, feasible, bounded);
+    this.iter = branchAndCutIterations;
+}
+MilpSolution.prototype = Object.create(TableauSolution.prototype);
+MilpSolution.constructor = MilpSolution;
+
+
+function Solution(tableau, evaluation, feasible, bounded) {
+    this.feasible = feasible;
+    this.evaluation = evaluation;
+    this.bounded = bounded;
+    this._tableau = tableau;
+}
+
+Solution.prototype.generateSolutionSet = function () {
+    var solutionSet = {};
+
+    var tableau = this._tableau;
+    var varIndexByRow = tableau.varIndexByRow;
+    var variablesPerIndex = tableau.variablesPerIndex;
+    var matrix = tableau.matrix;
+    var rhsColumn = tableau.rhsColumn;
+    var lastRow = tableau.height - 1;
+    var roundingCoeff = Math.round(1 / tableau.precision);
+
+    for (var r = 1; r <= lastRow; r += 1) {
+        var varIndex = varIndexByRow[r];
+        var variable = variablesPerIndex[varIndex];
+        if (variable === undefined || variable.isSlack === true) {
+            continue;
         }
 
-        return density / (this.height * this.width);
-    };
+        var varValue = matrix[r][rhsColumn];
+        solutionSet[variable.id] =
+            Math.round(varValue * roundingCoeff) / roundingCoeff;
+    }
 
-    //-------------------------------------------------------------------
-    //-------------------------------------------------------------------
-    Tableau.prototype.setEvaluation = function () {
-        // Rounding objective value
-        var roundingCoeff = Math.round(1 / this.precision);
-        var evaluation = this.matrix[this.costRowIndex][this.rhsColumn];
-        this.evaluation =
-            Math.round(evaluation * roundingCoeff) / roundingCoeff;
-    };
+    return solutionSet;
+};
 
-    //-------------------------------------------------------------------
-    //-------------------------------------------------------------------
-    Tableau.prototype.getSolution = function () {
-        var evaluation = (this.model.isMinimization === true) ?
-            this.evaluation : -this.evaluation;
+import MilpSolution from './Tableau/MilpSolution';
 
-        if (this.model.getNumberOfIntegerVariables() > 0) {
-            return new MilpSolution(this, evaluation, this.feasible, this.bounded, this.branchAndCutIterations);
+/*************************************************************
+ * Class: Tableau
+ * Description: Simplex tableau, holding a the tableau matrix
+ *              and all the information necessary to perform
+ *              the simplex algorithm
+ * Agruments:
+ *        precision: If we're solving a MILP, how tight
+ *                   do we want to define an integer, given
+ *                   that 20.000000000000001 is not an integer.
+ *                   (defaults to 1e-8)
+ **************************************************************/
+function Tableau(precision) {
+    this.model = null;
+
+    this.matrix = null;
+    this.width = 0;
+    this.height = 0;
+
+    this.costRowIndex = 0;
+    this.rhsColumn = 0;
+
+    this.variablesPerIndex = [];
+    this.unrestrictedVars = null;
+
+    // Solution attributes
+    this.feasible = true; // until proven guilty
+    this.evaluation = 0;
+
+    this.varIndexByRow = null;
+    this.varIndexByCol = null;
+
+    this.rowByVarIndex = null;
+    this.colByVarIndex = null;
+
+    this.precision = precision || 1e-8;
+
+    this.optionalObjectives = [];
+    this.objectivesByPriority = {};
+
+    this.savedState = null;
+
+    this.availableIndexes = [];
+    this.lastElementIndex = 0;
+
+    this.variables = null;
+    this.nVars = 0;
+
+    this.bounded = true;
+    this.unboundedVarIndex = null;
+
+    this.branchAndCutIterations = 0;
+}
+
+Tableau.prototype.solve = function () {
+    if (this.model.getNumberOfIntegerVariables() > 0) {
+        this.branchAndCut();
+    } else {
+        this.simplex();
+    }
+    this.updateVariableValues();
+    return this.getSolution();
+};
+
+function OptionalObjective(priority, nColumns) {
+    this.priority = priority;
+    this.reducedCosts = new Array(nColumns);
+    for (var c = 0; c < nColumns; c += 1) {
+        this.reducedCosts[c] = 0;
+    }
+}
+
+OptionalObjective.prototype.copy = function () {
+    var copy = new OptionalObjective(this.priority, this.reducedCosts.length);
+    copy.reducedCosts = this.reducedCosts.slice();
+    return copy;
+};
+
+Tableau.prototype.setOptionalObjective = function (priority, column, cost) {
+    var objectiveForPriority = this.objectivesByPriority[priority];
+    if (objectiveForPriority === undefined) {
+        var nColumns = Math.max(this.width, column + 1);
+        objectiveForPriority = new OptionalObjective(priority, nColumns);
+        this.objectivesByPriority[priority] = objectiveForPriority;
+        this.optionalObjectives.push(objectiveForPriority);
+        this.optionalObjectives.sort(function (a, b) {
+            return a.priority - b.priority;
+        });
+    }
+
+    objectiveForPriority.reducedCosts[column] = cost;
+};
+
+//-------------------------------------------------------------------
+//-------------------------------------------------------------------
+Tableau.prototype.initialize = function (width, height, variables, unrestrictedVars) {
+    this.variables = variables;
+    this.unrestrictedVars = unrestrictedVars;
+
+    this.width = width;
+    this.height = height;
+
+    // BUILD AN EMPTY ARRAY OF THAT WIDTH
+    var tmpRow = new Array(width);
+    for (var i = 0; i < width; i++) {
+        tmpRow[i] = 0;
+    }
+
+    // BUILD AN EMPTY TABLEAU
+    this.matrix = new Array(height);
+    for (var j = 0; j < height; j++) {
+        this.matrix[j] = tmpRow.slice();
+    }
+
+    this.varIndexByRow = new Array(this.height);
+    this.varIndexByCol = new Array(this.width);
+
+    this.varIndexByRow[0] = -1;
+    this.varIndexByCol[0] = -1;
+
+    this.nVars = width + height - 2;
+    this.rowByVarIndex = new Array(this.nVars);
+    this.colByVarIndex = new Array(this.nVars);
+
+    this.lastElementIndex = this.nVars;
+};
+
+Tableau.prototype._resetMatrix = function () {
+    var variables = this.model.variables;
+    var constraints = this.model.constraints;
+
+    var nVars = variables.length;
+    var nConstraints = constraints.length;
+
+    var v, varIndex;
+    var costRow = this.matrix[0];
+    var coeff = (this.model.isMinimization === true) ? -1 : 1;
+    for (v = 0; v < nVars; v += 1) {
+        var variable = variables[v];
+        var priority = variable.priority;
+        var cost = coeff * variable.cost;
+        if (priority === 0) {
+            costRow[v + 1] = cost;
         } else {
-            return new Solution(this, evaluation, this.feasible, this.bounded);
+            this.setOptionalObjective(priority, v + 1, cost);
         }
-    };
 
-/*global require*/
-var Tableau = require("./Tableau.js");
+        varIndex = variables[v].index;
+        this.rowByVarIndex[varIndex] = -1;
+        this.colByVarIndex[varIndex] = v + 1;
+        this.varIndexByCol[v + 1] = varIndex;
+    }
+
+    var rowIndex = 1;
+    for (var c = 0; c < nConstraints; c += 1) {
+        var constraint = constraints[c];
+
+        var constraintIndex = constraint.index;
+        this.rowByVarIndex[constraintIndex] = rowIndex;
+        this.colByVarIndex[constraintIndex] = -1;
+        this.varIndexByRow[rowIndex] = constraintIndex;
+
+        var t, term, column;
+        var terms = constraint.terms;
+        var nTerms = terms.length;
+        var row = this.matrix[rowIndex++];
+        if (constraint.isUpperBound) {
+            for (t = 0; t < nTerms; t += 1) {
+                term = terms[t];
+                column = this.colByVarIndex[term.variable.index];
+                row[column] = term.coefficient;
+            }
+
+            row[0] = constraint.rhs;
+        } else {
+            for (t = 0; t < nTerms; t += 1) {
+                term = terms[t];
+                column = this.colByVarIndex[term.variable.index];
+                row[column] = -term.coefficient;
+            }
+
+            row[0] = -constraint.rhs;
+        }
+    }
+};
+
+//-------------------------------------------------------------------
+//-------------------------------------------------------------------
+Tableau.prototype.setModel = function (model) {
+    this.model = model;
+
+    var width = model.nVariables + 1;
+    var height = model.nConstraints + 1;
+
+
+    this.initialize(width, height, model.variables, model.unrestrictedVariables);
+    this._resetMatrix();
+    return this;
+};
+
+Tableau.prototype.getNewElementIndex = function () {
+    if (this.availableIndexes.length > 0) {
+        return this.availableIndexes.pop();
+    }
+
+    var index = this.lastElementIndex;
+    this.lastElementIndex += 1;
+    return index;
+};
+
+Tableau.prototype.density = function () {
+    var density = 0;
+
+    var matrix = this.matrix;
+    for (var r = 0; r < this.height; r++) {
+        var row = matrix[r];
+        for (var c = 0; c < this.width; c++) {
+            if (row[c] !== 0) {
+                density += 1;
+            }
+        }
+    }
+
+    return density / (this.height * this.width);
+};
+
+//-------------------------------------------------------------------
+//-------------------------------------------------------------------
+Tableau.prototype.setEvaluation = function () {
+    // Rounding objective value
+    var roundingCoeff = Math.round(1 / this.precision);
+    var evaluation = this.matrix[this.costRowIndex][this.rhsColumn];
+    this.evaluation =
+        Math.round(evaluation * roundingCoeff) / roundingCoeff;
+};
+
+//-------------------------------------------------------------------
+//-------------------------------------------------------------------
+Tableau.prototype.getSolution = function () {
+    var evaluation = (this.model.isMinimization === true) ?
+        this.evaluation : -this.evaluation;
+
+    if (this.model.getNumberOfIntegerVariables() > 0) {
+        return new MilpSolution(this, evaluation, this.feasible, this.bounded, this.branchAndCutIterations);
+    } else {
+        return new Solution(this, evaluation, this.feasible, this.bounded);
+    }
+};
+
 
 Tableau.prototype.copy = function () {
     var copy = new Tableau(this.precision);
@@ -1251,13 +1244,6 @@ Tableau.prototype.restore = function () {
 };
 
 
-/*global describe*/
-/*global require*/
-/*global module*/
-/*global it*/
-/*global console*/
-/*global process*/
-var Tableau = require("./Tableau.js");
 
 //-------------------------------------------------------------------
 //-------------------------------------------------------------------
@@ -1483,8 +1469,6 @@ Tableau.prototype.branchAndCut = function () {
     this.branchAndCutIterations = iterations;
 };
 
-/*global require*/
-var Tableau = require("./Tableau.js");
 
 function VariableData(index, value) {
     this.index = index;
@@ -1553,9 +1537,8 @@ Tableau.prototype.getFractionalVarWithLowestCost = function () {
     return new VariableData(selectedVarIndex, selectedVarValue);
 };
 
-/*global require*/
-var Tableau = require("./Tableau.js");
-var SlackVariable = require("../expressions.js").SlackVariable;
+
+import { SlackVariable as SlackVariable_ } from './expressions';
 
 Tableau.prototype.addCutConstraints = function (cutConstraints) {
     var nCutConstraints = cutConstraints.length;
@@ -1610,7 +1593,7 @@ Tableau.prototype.addCutConstraints = function (cutConstraints) {
         this.varIndexByRow[r] = slackVarIndex;
         this.rowByVarIndex[slackVarIndex] = r;
         this.colByVarIndex[slackVarIndex] = -1;
-        this.variablesPerIndex[slackVarIndex] = new SlackVariable("s"+slackVarIndex, slackVarIndex);
+        this.variablesPerIndex[slackVarIndex] = new SlackVariable_("s"+slackVarIndex, slackVarIndex);
         this.nVars += 1;
     }
 };
@@ -1648,7 +1631,7 @@ Tableau.prototype._addLowerBoundMIRCut = function(rowIndex) {
 	this.varIndexByRow[r] = slackVarIndex;
 	this.rowByVarIndex[slackVarIndex] = r;
 	this.colByVarIndex[slackVarIndex] = -1;
-	this.variablesPerIndex[slackVarIndex] = new SlackVariable("s"+slackVarIndex, slackVarIndex);
+	this.variablesPerIndex[slackVarIndex] = new SlackVariable_("s"+slackVarIndex, slackVarIndex);
 
 	matrix[r][this.rhsColumn] = Math.floor(d);
 
@@ -1679,9 +1662,6 @@ Tableau.prototype.applyMIRCuts = function () {
 };
 
 
-/*global require*/
-/*global console*/
-var Tableau = require("./Tableau.js");
 
 //-------------------------------------------------------------------
 //-------------------------------------------------------------------
@@ -1984,18 +1964,15 @@ Tableau.prototype.removeVariable = function (variable) {
     this.width -= 1;
 };
 
-    /*global require*/
-    /*global module*/
-    require("./simplex.js");
-    require("./cuttingStrategies.js");
-    require("./dynamicModification.js");
-    require("./log.js");
-    require("./backup.js");
-    require("./branchingStrategies.js");
-    require("./integerProperties.js");
+import './Tableau/simplex';
 
-/*global require*/
-var Tableau = require("./Tableau.js");
+import './Tableau/cuttingStrategies';
+import './Tableau/dynamicModification';
+import './Tableau/log';
+import './Tableau/backup';
+import './Tableau/branchingStrategies';
+import './Tableau/integerProperties';
+
 
 Tableau.prototype.countIntegerValues = function(){
     var count = 0;
@@ -2082,9 +2059,6 @@ Tableau.prototype.computeFractionalVolume = function(ignoreIntegerValues) {
     return volume;
 };
 
-/*global require*/
-/*global console*/
-var Tableau = require("./Tableau.js");
 
 //-------------------------------------------------------------------
 // Description: Display a tableau matrix
@@ -2253,14 +2227,7 @@ Tableau.prototype.log = function (message, force) {
     return this;
 };
 
-/*global describe*/
-/*global require*/
-/*global module*/
-/*global it*/
-/*global console*/
-/*global process*/
 
-var Tableau = require("./Tableau.js");
 
 //-------------------------------------------------------------------
 // Function: solve
@@ -2647,432 +2614,418 @@ Tableau.prototype.checkForCycles = function (varIndexes) {
     return [];
 };
 
-    /*global describe*/
-    /*global require*/
-    /*global module*/
-    /*global it*/
-    /*global console*/
-    /*global process*/
-    /*global exports*/
 
 
-    // All functions in this module that
-    // get exported to main ***MUST***
-    // return a functional LPSolve JSON style
-    // model or throw an error
+// All functions in this module that
+// get exported to main ***MUST***
+// return a functional LPSolve JSON style
+// model or throw an error
 
-    export const CleanObjectiveAttributes = function(model){
-      // Test to see if the objective attribute
-      // is also used by one of the constraints
-      //
-      // If so...create a new attribute on each
-      // variable
-        var fakeAttr,
-            x, z;
-      
-        if(typeof model.optimize === "string"){
-            if(model.constraints[model.optimize]){
-                // Create the new attribute
-                fakeAttr = Math.random();
+export const CleanObjectiveAttributes = function(model){
+  // Test to see if the objective attribute
+  // is also used by one of the constraints
+  //
+  // If so...create a new attribute on each
+  // variable
+    var fakeAttr,
+        x, z;
+  
+    if(typeof model.optimize === "string"){
+        if(model.constraints[model.optimize]){
+            // Create the new attribute
+            fakeAttr = Math.random();
 
-                // Go over each variable and check
-                for(x in model.variables){
-                    // Is it there?
-                    if(model.variables[x][model.optimize]){
-                        model.variables[x][fakeAttr] = model.variables[x][model.optimize];
-                    }
+            // Go over each variable and check
+            for(x in model.variables){
+                // Is it there?
+                if(model.variables[x][model.optimize]){
+                    model.variables[x][fakeAttr] = model.variables[x][model.optimize];
                 }
-
-            // Now that we've cleaned up the variables
-            // we need to clean up the constraints
-                model.constraints[fakeAttr] = model.constraints[model.optimize];
-                delete model.constraints[model.optimize];
-                return model;
-            } else {    
-                return model;
-            }  
-        } else {
-            // We're assuming its an object?
-            for(z in model.optimize){
-                if(model.constraints[z]){
-                // Make sure that the constraint
-                // being optimized isn't constrained
-                // by an equity collar
-                    if(model.constraints[z] === "equal"){
-                        // Its constrained by an equal sign;
-                        // delete that objective and move on
-                        delete model.optimize[z];
-                    
-                    } else {
-                        // Create the new attribute
-                        fakeAttr = Math.random();
-
-                        // Go over each variable and check
-                        for(x in model.variables){
-                            // Is it there?
-                            if(model.variables[x][z]){
-                                model.variables[x][fakeAttr] = model.variables[x][z];
-                            }
-                        }
-                    // Now that we've cleaned up the variables
-                    // we need to clean up the constraints
-                        model.constraints[fakeAttr] = model.constraints[z];
-                        delete model.constraints[z];            
-                    }
-                }    
             }
+
+        // Now that we've cleaned up the variables
+        // we need to clean up the constraints
+            model.constraints[fakeAttr] = model.constraints[model.optimize];
+            delete model.constraints[model.optimize];
             return model;
+        } else {    
+            return model;
+        }  
+    } else {
+        // We're assuming its an object?
+        for(z in model.optimize){
+            if(model.constraints[z]){
+            // Make sure that the constraint
+            // being optimized isn't constrained
+            // by an equity collar
+                if(model.constraints[z] === "equal"){
+                    // Its constrained by an equal sign;
+                    // delete that objective and move on
+                    delete model.optimize[z];
+                
+                } else {
+                    // Create the new attribute
+                    fakeAttr = Math.random();
+
+                    // Go over each variable and check
+                    for(x in model.variables){
+                        // Is it there?
+                        if(model.variables[x][z]){
+                            model.variables[x][fakeAttr] = model.variables[x][z];
+                        }
+                    }
+                // Now that we've cleaned up the variables
+                // we need to clean up the constraints
+                    model.constraints[fakeAttr] = model.constraints[z];
+                    delete model.constraints[z];            
+                }
+            }    
         }
-    };
-    /*global describe*/
-    /*global require*/
-    /*global module*/
-    /*global it*/
-    /*global console*/
-    /*global process*/
+        return model;
+    }
+};
 
-    //-------------------------------------------------------------------
-    //-------------------------------------------------------------------
-    function Variable(id, cost, index, priority) {
-        this.id = id;
-        this.cost = cost;
-        this.index = index;
-        this.value = 0;
-        this.priority = priority;
+//-------------------------------------------------------------------
+//-------------------------------------------------------------------
+function Variable(id, cost, index, priority) {
+    this.id = id;
+    this.cost = cost;
+    this.index = index;
+    this.value = 0;
+    this.priority = priority;
+}
+
+function IntegerVariable(id, cost, index, priority) {
+    Variable.call(this, id, cost, index, priority);
+}
+IntegerVariable.prototype.isInteger = true;
+
+function SlackVariable(id, index) {
+    Variable.call(this, id, 0, index, 0);
+}
+SlackVariable.prototype.isSlack = true;
+
+//-------------------------------------------------------------------
+//-------------------------------------------------------------------
+function Term(variable, coefficient) {
+    this.variable = variable;
+    this.coefficient = coefficient;
+}
+
+function createRelaxationVariable(model, weight, priority) {
+    if (priority === 0 || priority === "required") {
+        return null;
     }
 
-    function IntegerVariable(id, cost, index, priority) {
-        Variable.call(this, id, cost, index, priority);
-    }
-    IntegerVariable.prototype.isInteger = true;
+    weight = weight || 1;
+    priority = priority || 1;
 
-    function SlackVariable(id, index) {
-        Variable.call(this, id, 0, index, 0);
-    }
-    SlackVariable.prototype.isSlack = true;
-
-    //-------------------------------------------------------------------
-    //-------------------------------------------------------------------
-    function Term(variable, coefficient) {
-        this.variable = variable;
-        this.coefficient = coefficient;
+    if (model.isMinimization === false) {
+        weight = -weight;
     }
 
-    function createRelaxationVariable(model, weight, priority) {
-        if (priority === 0 || priority === "required") {
-            return null;
+    return model.addVariable(weight, "r" + (model.relaxationIndex++), false, false, priority);
+}
+
+//-------------------------------------------------------------------
+//-------------------------------------------------------------------
+function Constraint(rhs, isUpperBound, index, model) {
+    this.slack = new SlackVariable("s" + index, index);
+    this.index = index;
+    this.model = model;
+    this.rhs = rhs;
+    this.isUpperBound = isUpperBound;
+
+    this.terms = [];
+    this.termsByVarIndex = {};
+
+    // Error variable in case the constraint is relaxed
+    this.relaxation = null;
+}
+
+Constraint.prototype.addTerm = function (coefficient, variable) {
+    var varIndex = variable.index;
+    var term = this.termsByVarIndex[varIndex];
+    if (term === undefined) {
+        // No term for given variable
+        term = new Term(variable, coefficient);
+        this.termsByVarIndex[varIndex] = term;
+        this.terms.push(term);
+        if (this.isUpperBound === true) {
+            coefficient = -coefficient;
+        }
+        this.model.updateConstraintCoefficient(this, variable, coefficient);
+    } else {
+        // Term for given variable already exists
+        // updating its coefficient
+        var newCoefficient = term.coefficient + coefficient;
+        this.setVariableCoefficient(newCoefficient, variable);
+    }
+
+    return this;
+};
+
+Constraint.prototype.removeTerm = function (term) {
+    // TODO
+    return this;
+};
+
+Constraint.prototype.setRightHandSide = function (newRhs) {
+    if (newRhs !== this.rhs) {
+        var difference = newRhs - this.rhs;
+        if (this.isUpperBound === true) {
+            difference = -difference;
         }
 
-        weight = weight || 1;
-        priority = priority || 1;
-
-        if (model.isMinimization === false) {
-            weight = -weight;
-        }
-
-        return model.addVariable(weight, "r" + (model.relaxationIndex++), false, false, priority);
+        this.rhs = newRhs;
+        this.model.updateRightHandSide(this, difference);
     }
 
-    //-------------------------------------------------------------------
-    //-------------------------------------------------------------------
-    function Constraint(rhs, isUpperBound, index, model) {
-        this.slack = new SlackVariable("s" + index, index);
-        this.index = index;
-        this.model = model;
-        this.rhs = rhs;
-        this.isUpperBound = isUpperBound;
+    return this;
+};
 
-        this.terms = [];
-        this.termsByVarIndex = {};
-
-        // Error variable in case the constraint is relaxed
-        this.relaxation = null;
+Constraint.prototype.setVariableCoefficient = function (newCoefficient, variable) {
+    var varIndex = variable.index;
+    if (varIndex === -1) {
+        console.warn("[Constraint.setVariableCoefficient] Trying to change coefficient of inexistant variable.");
+        return;
     }
 
-    Constraint.prototype.addTerm = function (coefficient, variable) {
-        var varIndex = variable.index;
-        var term = this.termsByVarIndex[varIndex];
-        if (term === undefined) {
-            // No term for given variable
-            term = new Term(variable, coefficient);
-            this.termsByVarIndex[varIndex] = term;
-            this.terms.push(term);
-            if (this.isUpperBound === true) {
-                coefficient = -coefficient;
-            }
-            this.model.updateConstraintCoefficient(this, variable, coefficient);
-        } else {
-            // Term for given variable already exists
-            // updating its coefficient
-            var newCoefficient = term.coefficient + coefficient;
-            this.setVariableCoefficient(newCoefficient, variable);
-        }
-
-        return this;
-    };
-
-    Constraint.prototype.removeTerm = function (term) {
-        // TODO
-        return this;
-    };
-
-    Constraint.prototype.setRightHandSide = function (newRhs) {
-        if (newRhs !== this.rhs) {
-            var difference = newRhs - this.rhs;
+    var term = this.termsByVarIndex[varIndex];
+    if (term === undefined) {
+        // No term for given variable
+        this.addTerm(newCoefficient, variable);
+    } else {
+        // Term for given variable already exists
+        // updating its coefficient if changed
+        if (newCoefficient !== term.coefficient) {
+            var difference = newCoefficient - term.coefficient;
             if (this.isUpperBound === true) {
                 difference = -difference;
             }
 
-            this.rhs = newRhs;
-            this.model.updateRightHandSide(this, difference);
+            term.coefficient = newCoefficient;
+            this.model.updateConstraintCoefficient(this, variable, difference);
         }
-
-        return this;
-    };
-
-    Constraint.prototype.setVariableCoefficient = function (newCoefficient, variable) {
-        var varIndex = variable.index;
-        if (varIndex === -1) {
-            console.warn("[Constraint.setVariableCoefficient] Trying to change coefficient of inexistant variable.");
-            return;
-        }
-
-        var term = this.termsByVarIndex[varIndex];
-        if (term === undefined) {
-            // No term for given variable
-            this.addTerm(newCoefficient, variable);
-        } else {
-            // Term for given variable already exists
-            // updating its coefficient if changed
-            if (newCoefficient !== term.coefficient) {
-                var difference = newCoefficient - term.coefficient;
-                if (this.isUpperBound === true) {
-                    difference = -difference;
-                }
-
-                term.coefficient = newCoefficient;
-                this.model.updateConstraintCoefficient(this, variable, difference);
-            }
-        }
-
-        return this;
-    };
-
-    Constraint.prototype.relax = function (weight, priority) {
-        this.relaxation = createRelaxationVariable(this.model, weight, priority);
-        this._relax(this.relaxation);
-    };
-
-    Constraint.prototype._relax = function (relaxationVariable) {
-        if (relaxationVariable === null) {
-            // Relaxation variable not created, priority was probably "required"
-            return;
-        }
-
-        if (this.isUpperBound) {
-            this.setVariableCoefficient(-1, relaxationVariable);
-        } else {
-            this.setVariableCoefficient(1, relaxationVariable);
-        }
-    };
-
-    //-------------------------------------------------------------------
-    //-------------------------------------------------------------------
-    function Equality(constraintUpper, constraintLower) {
-        this.upperBound = constraintUpper;
-        this.lowerBound = constraintLower;
-        this.model = constraintUpper.model;
-        this.rhs = constraintUpper.rhs;
-        this.relaxation = null;
     }
 
-    Equality.prototype.isEquality = true;
+    return this;
+};
 
-    Equality.prototype.addTerm = function (coefficient, variable) {
-        this.upperBound.addTerm(coefficient, variable);
-        this.lowerBound.addTerm(coefficient, variable);
-        return this;
-    };
+Constraint.prototype.relax = function (weight, priority) {
+    this.relaxation = createRelaxationVariable(this.model, weight, priority);
+    this._relax(this.relaxation);
+};
 
-    Equality.prototype.removeTerm = function (term) {
-        this.upperBound.removeTerm(term);
-        this.lowerBound.removeTerm(term);
-        return this;
-    };
+Constraint.prototype._relax = function (relaxationVariable) {
+    if (relaxationVariable === null) {
+        // Relaxation variable not created, priority was probably "required"
+        return;
+    }
 
-    Equality.prototype.setRightHandSide = function (rhs) {
-        this.upperBound.setRightHandSide(rhs);
-        this.lowerBound.setRightHandSide(rhs);
-        this.rhs = rhs;
-    };
+    if (this.isUpperBound) {
+        this.setVariableCoefficient(-1, relaxationVariable);
+    } else {
+        this.setVariableCoefficient(1, relaxationVariable);
+    }
+};
 
-    Equality.prototype.relax = function (weight, priority) {
-        this.relaxation = createRelaxationVariable(this.model, weight, priority);
-        this.upperBound.relaxation = this.relaxation;
-        this.upperBound._relax(this.relaxation);
-        this.lowerBound.relaxation = this.relaxation;
-        this.lowerBound._relax(this.relaxation);
-    };
+//-------------------------------------------------------------------
+//-------------------------------------------------------------------
+function Equality(constraintUpper, constraintLower) {
+    this.upperBound = constraintUpper;
+    this.lowerBound = constraintLower;
+    this.model = constraintUpper.model;
+    this.rhs = constraintUpper.rhs;
+    this.relaxation = null;
+}
+
+Equality.prototype.isEquality = true;
+
+Equality.prototype.addTerm = function (coefficient, variable) {
+    this.upperBound.addTerm(coefficient, variable);
+    this.lowerBound.addTerm(coefficient, variable);
+    return this;
+};
+
+Equality.prototype.removeTerm = function (term) {
+    this.upperBound.removeTerm(term);
+    this.lowerBound.removeTerm(term);
+    return this;
+};
+
+Equality.prototype.setRightHandSide = function (rhs) {
+    this.upperBound.setRightHandSide(rhs);
+    this.lowerBound.setRightHandSide(rhs);
+    this.rhs = rhs;
+};
+
+Equality.prototype.relax = function (weight, priority) {
+    this.relaxation = createRelaxationVariable(this.model, weight, priority);
+    this.upperBound.relaxation = this.relaxation;
+    this.upperBound._relax(this.relaxation);
+    this.lowerBound.relaxation = this.relaxation;
+    this.lowerBound._relax(this.relaxation);
+};
 
 
-     const foo = {
-       Constraint: Constraint,
-        Variable: Variable,
-        IntegerVariable: IntegerVariable,
-        SlackVariable: SlackVariable,
-        Equality: Equality,
-        Term: Term
-    };
+const foo = {
+  Constraint: Constraint,
+   Variable: Variable,
+   IntegerVariable: IntegerVariable,
+   SlackVariable: SlackVariable,
+   Equality: Equality,
+   Term: Term
+};
 
-    //-------------------------------------------------------------------
-    // SimplexJS
-    // https://github.com/
-    // An Object-Oriented Linear Programming Solver
-    //
-    // By Justin Wolcott (c)
-    // Licensed under the MIT License.
-    //-------------------------------------------------------------------
+//-------------------------------------------------------------------
+// SimplexJS
+// https://github.com/
+// An Object-Oriented Linear Programming Solver
+//
+// By Justin Wolcott (c)
+// Licensed under the MIT License.
+//-------------------------------------------------------------------
 
-    var Tableau = require("./Tableau/index.js");
-    var Model = require("./Model");
-    var branchAndCut = require("./Tableau/branchAndCut");
-    var expressions = require("./expressions.js");
-    var validation = require("./Validation");
-    var Constraint = expressions.Constraint;
-    var Variable = expressions.Variable;
-    var Numeral = expressions.Numeral;
-    var Term = expressions.Term;
+import Tableau from './Tableau';
 
-    // Place everything under the Solver Name Space
-    var Solver = function () {
+import Model from './Model';
+import validation from './Validation';
+var Constraint = expressions.Constraint;
+var Variable = expressions.Variable;
+var Numeral = expressions.Numeral;
+var Term = expressions.Term;
 
-        "use strict";
+// Place everything under the Solver Name Space
+var Solver = function () {
 
-        this.Model = Model;
-        this.branchAndCut = branchAndCut;
-        this.Constraint = Constraint;
-        this.Variable = Variable;
-        this.Numeral = Numeral;
-        this.Term = Term;
-        this.Tableau = Tableau;
+    "use strict";
 
-        this.lastSolvedModel = null;
+    this.Model = Model;
+    this.branchAndCut = branchAndCut;
+    this.Constraint = Constraint;
+    this.Variable = Variable;
+    this.Numeral = Numeral;
+    this.Term = Term;
+    this.Tableau = Tableau;
 
-        /*************************************************************
-         * Method: Solve
-         * Scope: Public:
-         * Agruments:
-         *        model: The model we want solver to operate on
-         *        precision: If we're solving a MILP, how tight
-         *                   do we want to define an integer, given
-         *                   that 20.000000000000001 is not an integer.
-         *                   (defaults to 1e-9)
-         *            full: *get better description*
-         *        validate: if left blank, it will get ignored; otherwise
-         *                  it will run the model through all validation
-         *                  functions in the *Validate* module
-         **************************************************************/
-        this.Solve = function (model, precision, full, validate) {
-            // Run our validations on the model
-            // if the model doesn't have a validate
-            // attribute set to false
-            if(validate){
-                for(var test in validation){
-                    model = validation[test](model);
-                }
+    this.lastSolvedModel = null;
+
+    /*************************************************************
+     * Method: Solve
+     * Scope: Public:
+     * Agruments:
+     *        model: The model we want solver to operate on
+     *        precision: If we're solving a MILP, how tight
+     *                   do we want to define an integer, given
+     *                   that 20.000000000000001 is not an integer.
+     *                   (defaults to 1e-9)
+     *            full: *get better description*
+     *        validate: if left blank, it will get ignored; otherwise
+     *                  it will run the model through all validation
+     *                  functions in the *Validate* module
+     **************************************************************/
+    this.Solve = function (model, precision, full, validate) {
+        // Run our validations on the model
+        // if the model doesn't have a validate
+        // attribute set to false
+        if(validate){
+            for(var test in validation){
+                model = validation[test](model);
             }
+        }
 
-            // Make sure we at least have a model
-            if (!model) {
-                throw new Error("Solver requires a model to operate on");
-            }
+        // Make sure we at least have a model
+        if (!model) {
+            throw new Error("Solver requires a model to operate on");
+        }
 
-            if (model instanceof Model === false) {
-                model = new Model(precision).loadJson(model);
-            }
+        if (model instanceof Model === false) {
+            model = new Model(precision).loadJson(model);
+        }
 
-            var solution = model.solve();
-            this.lastSolvedModel = model;
-            solution.solutionSet = solution.generateSolutionSet();
+        var solution = model.solve();
+        this.lastSolvedModel = model;
+        solution.solutionSet = solution.generateSolutionSet();
 
-            // If the user asks for a full breakdown
-            // of the tableau (e.g. full === true)
-            // this will return it
-            if (full) {
-                return solution;
-            } else {
-                // Otherwise; give the user the bare
-                // minimum of info necessary to carry on
+        // If the user asks for a full breakdown
+        // of the tableau (e.g. full === true)
+        // this will return it
+        if (full) {
+            return solution;
+        } else {
+            // Otherwise; give the user the bare
+            // minimum of info necessary to carry on
 
-                var store = {};
+            var store = {};
 
-                // 1.) Add in feasibility to store;
-                store.feasible = solution.feasible;
+            // 1.) Add in feasibility to store;
+            store.feasible = solution.feasible;
 
-                // 2.) Add in the objective value
-                store.result = solution.evaluation;
+            // 2.) Add in the objective value
+            store.result = solution.evaluation;
 
-                store.bounded = solution.bounded;
+            store.bounded = solution.bounded;
 
-                // 3.) Load all of the variable values
-                Object.keys(solution.solutionSet)
-                    .map(function (d) {
-                        store[d] = solution.solutionSet[d];
-                    });
+            // 3.) Load all of the variable values
+            Object.keys(solution.solutionSet)
+                .map(function (d) {
+                    store[d] = solution.solutionSet[d];
+                });
 
-                return store;
-            }
+            return store;
+        }
 
-        };
-
-        /*************************************************************
-         * Method: ReformatLP
-         * Scope: Public:
-         * Agruments: model: The model we want solver to operate on
-         * Purpose: Convert a friendly JSON model into a model for a
-         *          real solving library...in this case
-         *          lp_solver
-         **************************************************************/
-        this.ReformatLP = require("./Reformat");
-
-
-         /*************************************************************
-         * Method: MultiObjective
-         * Scope: Public:
-         * Agruments:
-         *        model: The model we want solver to operate on
-         *        detail: if false, or undefined; it will return the
-         *                result of using the mid-point formula; otherwise
-         *                it will return an object containing:
-         *
-         *                1. The results from the mid point formula
-         *                2. The solution for each objective solved
-         *                   in isolation (pareto)
-         *                3. The min and max of each variable along
-         *                   the frontier of the polytope (ranges)
-         * Purpose: Solve a model with multiple objective functions.
-         *          Since a potential infinite number of solutions exist
-         *          this naively returns the mid-point between
-         *
-         * Note: The model has to be changed a little to work with this.
-         *       Before an *opType* was required. No more. The objective
-         *       attribute of the model is now an object instead of a
-         *       string.
-         *
-         *  *EXAMPLE MODEL*
-         *
-         *   model = {
-         *       optimize: {scotch: "max", soda: "max"},
-         *       constraints: {fluid: {equal: 100}},
-         *       variables: {
-         *           scotch: {fluid: 1, scotch: 1},
-         *           soda: {fluid: 1, soda: 1}
-         *       }
-         *   }
-         *
-         **************************************************************/
-        this.MultiObjective = function(model){
-            return require("./Polyopt")(this, model);
-        };
-        
     };
+
+    /*************************************************************
+     * Method: ReformatLP
+     * Scope: Public:
+     * Agruments: model: The model we want solver to operate on
+     * Purpose: Convert a friendly JSON model into a model for a
+     *          real solving library...in this case
+     *          lp_solver
+     **************************************************************/
+    this.ReformatLP = require("./Reformat");
+
+
+     /*************************************************************
+     * Method: MultiObjective
+     * Scope: Public:
+     * Agruments:
+     *        model: The model we want solver to operate on
+     *        detail: if false, or undefined; it will return the
+     *                result of using the mid-point formula; otherwise
+     *                it will return an object containing:
+     *
+     *                1. The results from the mid point formula
+     *                2. The solution for each objective solved
+     *                   in isolation (pareto)
+     *                3. The min and max of each variable along
+     *                   the frontier of the polytope (ranges)
+     * Purpose: Solve a model with multiple objective functions.
+     *          Since a potential infinite number of solutions exist
+     *          this naively returns the mid-point between
+     *
+     * Note: The model has to be changed a little to work with this.
+     *       Before an *opType* was required. No more. The objective
+     *       attribute of the model is now an object instead of a
+     *       string.
+     *
+     *  *EXAMPLE MODEL*
+     *
+     *   model = {
+     *       optimize: {scotch: "max", soda: "max"},
+     *       constraints: {fluid: {equal: 100}},
+     *       variables: {
+     *           scotch: {fluid: 1, scotch: 1},
+     *           soda: {fluid: 1, soda: 1}
+     *       }
+     *   }
+     *
+     **************************************************************/
+    this.MultiObjective = function(model){
+        return require("./Polyopt")(this, model);
+    };
+    
+};

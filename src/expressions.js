@@ -1,12 +1,3 @@
-/*global describe*/
-/*global require*/
-/*global module*/
-/*global it*/
-/*global console*/
-/*global process*/
-
-//-------------------------------------------------------------------
-//-------------------------------------------------------------------
 function Variable(id, cost, index, priority) {
     this.id = id;
     this.cost = cost;
